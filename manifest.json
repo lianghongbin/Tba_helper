@@ -1,0 +1,30 @@
+{
+    "manifest_version": 3,
+    "name": "TBA FixKing",
+    "version": "1.0",
+    "description": "Automatically correct sku codes.",
+    "permissions": [
+        "scripting",
+        "declarativeNetRequest",
+        "storage",
+        "alarms"
+    ],
+    "host_permissions": [
+        "http://yzt.wms.yunwms.com/*",
+        "https://yzt.wms.yunwms.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "http://yzt.wms.yunwms.com/*",
+                "https://yzt.wms.yunwms.com/*"
+            ],
+            "js": ["content.js"],
+            "run_at": "document_idle",
+            "all_frames": true
+        }
+    ]
+}
