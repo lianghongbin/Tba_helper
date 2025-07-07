@@ -20,6 +20,7 @@ function openDB() {
 }
 
 function clearIndexedDB() {
+    console.log('开始执行 clearIndexedDB......');
     return new Promise((resolve, reject) => {
         openDB().then(db => {
             const transaction = db.transaction(['pickingDetails'], 'readwrite');
@@ -37,6 +38,7 @@ function clearIndexedDB() {
 }
 
 function saveToIndexedDB(extractedData) {
+    console.log('开始执行 saveToIndexedDB......');
     return new Promise((resolve, reject) => {
         openDB().then(db => {
             const transaction = db.transaction(['pickingDetails'], 'readwrite');
@@ -68,6 +70,7 @@ function saveToIndexedDB(extractedData) {
 }
 
 function getAllPickingDetails(callback) {
+    console.log('开始执行 getAllPickingDetails......');
     openDB().then(db => {
         const transaction = db.transaction(['pickingDetails'], 'readonly');
         const store = transaction.objectStore('pickingDetails');
@@ -80,6 +83,7 @@ function getAllPickingDetails(callback) {
 }
 
 function getSkuCodesByPickingNo(picking_no, sku_code, callback) {
+    console.log('开始执行 getSkuCodesByPickingNo......');
     openDB().then(db => {
         const transaction = db.transaction(['pickingDetails'], 'readonly');
         const store = transaction.objectStore('pickingDetails');
@@ -100,8 +104,8 @@ function getSkuCodesByPickingNo(picking_no, sku_code, callback) {
 }
 
 function fetchPickingDetails(pickingNumbers) {
-    const url = 'https://yzt.wms.yunwms.com/shipment/picking-detail/list/page/1/pageSize/2000';
-
+    const url = 'http://yzt.wms.yunwms.com/shipment/picking-detail/list/page/1/pageSize/2000';
+    console.log('开始执行 fetchPickingDetails......')
     return Promise.all(pickingNumbers.map(pickingNumber => {
         const params = new URLSearchParams({ E01: pickingNumber, status_tag_type: '1' });
 
@@ -137,6 +141,8 @@ function fetchPickingDetails(pickingNumbers) {
 }
 
 function fetchShipmentData() {
+    console.log('开始执行 fetchShipmentData......');
+
     const now = Date.now();
     const today = getCurrentDate();
 
@@ -154,7 +160,7 @@ function fetchShipmentData() {
             }, () => {
                 clearIndexedDB()
                     .then(() => {
-                        const url = 'https://yzt.wms.yunwms.com/shipment/picking/list/page/1/pageSize/200';
+                        const url = 'http://yzt.wms.yunwms.com/shipment/picking/list/page/1/pageSize/200';
                         const params = new URLSearchParams({ E1: '2', dateFor: today });
 
                         fetch(url, {
@@ -186,7 +192,8 @@ function fetchShipmentData() {
                                 });
                             })
                             .catch(error => {
-                                console.error('请求失败:', error);
+                                console.error('❌ fetch 请求失败:',error, error.stack);
+                                console.log('🔎 请求的 URL:', url);
                                 reject(error);
                             });
                     })
@@ -200,6 +207,8 @@ function fetchShipmentData() {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('收到消息:', request);
+
     if (request.action === 'getPickingDetails') {
         getAllPickingDetails(response => sendResponse(response));
         return true;
@@ -207,6 +216,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         getSkuCodesByPickingNo(request.picking_no, request.sku_code, response => sendResponse(response));
         return true;
     } else if (request.action === 'fetchShipmentData') {
+        console.log('准备调用 fetchShipmentData');
         fetchShipmentData().then(() => sendResponse({ status: 'fetchShipmentData triggered', hasFetched: true }));
         return true;
     } else if (request.action === 'checkFetchStatus') {
@@ -218,6 +228,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ hasFetched, lastFetchDate: fetchStatus.lastFetchDate, completed: fetchStatus.completed });
         });
         return true;
+    } else if (request.action === 'resetFetchStatus') {
+        chrome.storage.local.remove('fetchStatus', () => {
+            console.log('🔄 fetchStatus 手动重置完成');
+            sendResponse({ ok: true });
+        });
+        return true; // keep the port open
     }
 });
 
