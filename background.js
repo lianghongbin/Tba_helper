@@ -116,12 +116,13 @@ function fetchPickingDetails(pickingNumbers) {
             credentials: 'include'
         })
             .then(response => {
+                console.log('------------', response.status, '---------------')
                 if (!response.ok) throw new Error(`请求拣货单号 ${pickingNumber} 详情失败: ${response.status}`);
                 return response.json();
             })
             .then(json => {
                 if (json.data && Array.isArray(json.data)) {
-                    return json.data.map(item => ({ picking_no: item.E01, sku_code: item.E11 }));
+                    return json.data.map(item => ({ picking_no: item.E01, sku_code: item.E11, count: item.E6 }));
                 } else {
                     console.log(`拣货单号 ${pickingNumber} 的数据格式不正确`);
                     return [];

@@ -1,18 +1,17 @@
-// iframe-content.js
-(() => {
-    // 1️⃣ 用 globalThis 兼容不同全局对象
-    if (globalThis.__myIframeInjected) return;
-    globalThis.__myIframeInjected = true;
+(function addRemainingLabel() {
+    // 1️⃣ 精确锁定目标按钮
+    const btn = document.querySelector('input.baseBtn.submitProduct[value="确认"]');
+    if (!btn) return;                                // 没找到按钮就结束
 
-    // 2️⃣ 也在 DOM 上打一个标记，双保险
-    if (document.documentElement.hasAttribute('data-my-injected')) return;
-    document.documentElement.setAttribute('data-my-injected', '');
+    // 2️⃣ 避免重复插入
+    if (btn.nextElementSibling?.classList?.contains('remaining-info')) return;
 
-    // 3️⃣ 业务逻辑……
-    const badge = document.createElement('div');
-    badge.textContent = '插件已注入 ✓';
-    badge.style.cssText =
-        'position:fixed;top:12px;right:16px;padding:4px 8px;' +
-        'background:#ff5722;color:#fff;z-index:2147483647;';
-    document.body.appendChild(badge);
+    // 3️⃣ 创建提示文本
+    const span = document.createElement('span');
+    span.textContent = '还剩一个';
+    span.className   = 'remaining-info';
+    span.style.cssText = 'margin-left:8px; color:#d32f2f; font-size:12px;';
+
+    // 4️⃣ 插到按钮右边
+    btn.insertAdjacentElement('afterend', span);
 })();
