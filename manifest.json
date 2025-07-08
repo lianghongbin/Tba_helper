@@ -5,6 +5,7 @@
     "description": "Automatically correct sku codes.",
     "permissions": [
         "scripting",
+        "webNavigation",
         "declarativeNetRequest",
         "storage",
         "alarms",
@@ -25,6 +26,15 @@
         {
             "matches": [
                 "http://yzt.wms.yunwms.com/*",
+                "https://yzt.wms.yunwms.com/*"
+            ],
+            "js": ["content.js"],
+            "run_at": "document_idle",
+            "all_frames": true
+        },
+        {
+            "matches": [
+                "http://yzt.wms.yunwms.com//shipment/orders-one-pack/list?quick=103&__tenant_id=yzt&__sys_company_code=ntexjrq&__token=*",
                 "https://yzt.wms.yunwms.com/*"
             ],
             "js": ["content.js"],

@@ -245,3 +245,41 @@ chrome.alarms.onAlarm.addListener(alarm => {
         fetchShipmentData();
     }
 });
+
+//监听 iframe加载
+// ❶ 约定 iframe URL 中必须包含 key 字串，比如 "/report.html"
+const TARGET_IFRAME_PATTERN = /\/shipment\/orders-one-pack\/list\?quick=103/;
+
+
+// ❷ 监听页面上任何 frame 完成加载
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+    // 排除顶层 frame（frameId===0）
+    if (details.frameId === 0) return;
+
+    // 用正则判断这是我们要注入的 iframe
+    if (TARGET_IFRAME_PATTERN.test(details.url)) {
+        console.log('🎯 命中目标 iframe: ', details.url);
+
+        // 幂等锁：防止同 iframe 重复注入
+        const key = `${details.tabId}-${details.frameId}`;
+        if (await isAlreadyInjected(key)) return;
+
+        // ❸ 向该 frame 注入脚本 & 样式
+        await chrome.scripting.insertCSS({
+            target: { tabId: details.tabId, frameIds: [details.frameId] },
+            files:  ['iframe-style.css']
+        });
+
+        await chrome.scripting.executeScript({
+            target: { tabId: details.tabId, frameIds: [details.frameId] },
+            files:  ['iframe-content.js']
+        });
+
+        markInjected(key);
+    }
+});
+
+/* --- 简单的本地 injected 缓存 --- */
+const injectedMap = new Set();
+function isAlreadyInjected(k) { return Promise.resolve(injectedMap.has(k)); }
+function markInjected(k)     { injectedMap.add(k); }

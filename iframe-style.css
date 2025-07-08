@@ -1,0 +1,12 @@
+/* 所有样式包在唯一前缀，避免污染宿主页面 */
+.my-widget-badge {
+    position: fixed;
+    top: 12px;
+    right: 16px;
+    padding: 4px 8px;
+    background: #ff5722;
+    color: #fff;
+    font-size: 12px;
+    border-radius: 4px;
+    z-index: 2147483647; /* 最高层 */
+}
