@@ -57,7 +57,7 @@ chrome.alarms.create('updateShipmentData', { periodInMinutes: 240 }); // 每 4 �
 // 监听定时任务
 chrome.alarms.onAlarm.addListener(alarm => {
     if (alarm.name === 'updateShipmentData') {
-        console.log('定时更新 fetchPackings');
+        console.log('定时更新 fetchPickings');
         PickingFetcher.fetchPickings();
     }
 });

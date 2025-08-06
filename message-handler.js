@@ -9,17 +9,17 @@ const MessageHandler = {
         } else if (request.action === 'getSkuCodesByPickingNo') {
             Database.getSkuCodesByPickingNo(request.picking_no, request.sku_code, response => sendResponse(response));
             return true;
-        } else if (request.action === 'fetchPackings') {
-            console.log('准备调用 fetchPackings');
+        } else if (request.action === 'fetchPickings') {
+            console.log('准备调用 fetchPickings');
             
             // 直接调用PickingFetcher
             PickingFetcher.fetchPickings()
                 .then((dataCount) => {
-                    console.log('fetchPackings 执行成功');
+                    console.log('fetchPickings 执行成功');
                     sendResponse({ status: 'success', hasFetched: true, dataCount: dataCount });
                 })
                 .catch((error) => {
-                    console.error('fetchPackings 执行失败:', error);
+                    console.error('fetchPickings 执行失败:', error);
                     
                     // 如果是版本冲突错误，自动删除数据库并重试
                     if (error.message && error.message.includes('version')) {
@@ -30,7 +30,7 @@ const MessageHandler = {
                                 return PickingFetcher.fetchPickings();
                             })
                             .then((dataCount) => {
-                                console.log('重试成功，fetchPackings 执行成功');
+                                console.log('重试成功，fetchPickings 执行成功');
                                 sendResponse({ status: 'success', hasFetched: true, dataCount: dataCount });
                             })
                             .catch((retryError) => {

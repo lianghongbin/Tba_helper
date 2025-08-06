@@ -188,7 +188,7 @@ function createDataTable(data) {
 function getStatusText(item) {
     const statuses = [];
     if (item.picking_status) statuses.push(`拣货:${item.picking_status}`);
-    if (item.packing_status) statuses.push(`包装:${item.packing_status}`);
+    if (item.picking_status) statuses.push(`包装:${item.picking_status}`);
     if (item.pda_picking_status) statuses.push(`PDA:${item.pda_picking_status}`);
     return statuses.length > 0 ? statuses.join(', ') : '-';
 }

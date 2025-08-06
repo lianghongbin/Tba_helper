@@ -118,7 +118,7 @@ const PickingFetcher = {
                                     chrome.storage.local.set({
                                         fetchStatus: { lastFetchDate: today, completed: true, lastFetchTime: now }
                                     }, () => {
-                                        console.log(`fetchPackings 完成，抓取了 ${dataCount} 条数据`);
+                                        console.log(`fetchPickings 完成，抓取了 ${dataCount} 条数据`);
                                         clearTimeout(timeout);
                                         resolve(dataCount);
                                     });

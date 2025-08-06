@@ -20,7 +20,7 @@ function initializeEventListeners() {
         info.textContent = '正在抓取发货数据，请稍候...';
         info.className = 'loading';
 
-        safeSendMessage({ action: 'fetchPackings' }, (resp) => {
+        safeSendMessage({ action: 'fetchPickings' }, (resp) => {
             console.log('抓取数据响应:', resp);
             
             if (resp && resp.status === 'success') {

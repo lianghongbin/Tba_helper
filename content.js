@@ -7,7 +7,7 @@
 let isInitialized = false;
 let observer = null;
 let lastInitMenuLog = 0;
-let dailyFetchChecked = false; // 跟踪当天是否已检查过fetchPackings
+let dailyFetchChecked = false; // 跟踪当天是否已检查过fetchPickings
 
 /**
  * 安全的Chrome扩展消息发送函数
@@ -154,16 +154,16 @@ function initializeShipmentMenuHandler() {
             safeSendMessage({ action: 'checkFetchStatus' }, (response) => {
                 console.log('checkFetchStatus 响应:', response);
                 if (!response || !response.hasFetched || response.lastFetchDate !== today || !response.completed) {
-                    console.log('触发 fetchPackings');
-                    safeSendMessage({ action: 'fetchPackings' }, (fetchResponse) => {
-                        console.log('fetchPackings 响应:', fetchResponse);
+                    console.log('触发 fetchPickings');
+                    safeSendMessage({ action: 'fetchPickings' }, (fetchResponse) => {
+                        console.log('fetchPickings 响应:', fetchResponse);
                     });
                 } else {
-                    console.log('当天 fetchPackings 已完成，跳过');
+                    console.log('当天 fetchPickings 已完成，跳过');
                 }
             });
         } else {
-            console.log('当天已检查过fetchPackings，跳过');
+            console.log('当天已检查过fetchPickings，跳过');
         }
         return true;
     }
@@ -411,10 +411,10 @@ function init() {
     const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
     if (lastCheckDate !== today) {
         dailyFetchChecked = false;
-        console.log('新的一天，重置fetchPackings检查状态');
+        console.log('新的一天，重置fetchPickings检查状态');
     } else {
         dailyFetchChecked = true;
-        console.log('当天已检查过fetchPackings，跳过启动检查');
+        console.log('当天已检查过fetchPickings，跳过启动检查');
     }
     
     setupSPAListener();
@@ -719,7 +719,7 @@ window.testTBAHelper = {
     },
     fetchData: () => {
         console.log('开始抓取发货数据...');
-        safeSendMessage({ action: 'fetchPackings' }, (resp) => {
+        safeSendMessage({ action: 'fetchPickings' }, (resp) => {
             if (resp && resp.status === 'success') {
                 const dataCount = resp.dataCount || 0;
                 console.log(`✅ 抓取发货数据成功！共抓取 ${dataCount} 条数据`);
