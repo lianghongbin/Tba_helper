@@ -31,7 +31,7 @@
                 "http://yzt.wms.yunwms.com/*",
                 "https://yzt.wms.yunwms.com/*"
             ],
-            "js": ["utils.js", "content.js"],
+            "js": ["utils.js", "database.js", "warehouse-storage.js", "warehouse-manager.js", "picking-code-selector.js", "content.js"],
             "run_at": "document_idle",
             "all_frames": true
         }
@@ -41,7 +41,9 @@
             "resources": [
                 "utils.js",
                 "database.js",
-
+                "warehouse-storage.js",
+                "warehouse-manager.js",
+                "picking-code-selector.js",
                 "picking-fetcher.js",
                 "message-handler.js",
                 "iframe-injector.js",

@@ -349,5 +349,102 @@ const Database = {
                 reject(error);
             });
         });
+    },
+
+    /**
+     * 获取拣货类型名称
+     * @param {string} pickingType - 拣货类型代码
+     * @returns {string} - 拣货类型名称
+     */
+    getPickingTypeName(pickingType) {
+        switch (pickingType) {
+            case '0':
+                return '一票一件';
+            case '1':
+                return '一票一件多个';
+            case '2':
+                return '一票多件';
+            default:
+                return `未知类型[${pickingType}]`;
+        }
+    },
+
+    /**
+     * 根据仓库ID获取拣货单列表
+     * @param {string} warehouseCode - 仓库ID：'1' 或 '2'
+     * @param {boolean} isSkuPack - 是否为按SKU打包页面
+     * @param {boolean} isSorting - 是否为二次分拣页面
+     * @returns {Promise<Array>} - 拣货单号数组
+     */
+    getPickingCodesByWarehouse(warehouseCode, isSkuPack = false, isSorting = false) {
+        console.log(`开始查询仓库 ${warehouseCode} 的拣货单列表，按SKU打包: ${isSkuPack}，二次分拣: ${isSorting}`);
+        
+        return new Promise((resolve, reject) => {
+            this.openDB().then(db => {
+                const transaction = db.transaction(['pickingDetails'], 'readonly');
+                const store = transaction.objectStore('pickingDetails');
+                const getAllRequest = store.getAll();
+
+                getAllRequest.onsuccess = () => {
+                    const allRecords = getAllRequest.result;
+                    console.log(`数据库中共有 ${allRecords.length} 条拣货单记录`);
+                    
+                    // 调试：查看第一条记录的结构
+                    if (allRecords.length > 0) {
+                        console.log('第一条记录的结构:', allRecords[0]);
+                        console.log('warehouse_code字段值:', allRecords[0].warehouse_code);
+                        console.log('warehouse字段值:', allRecords[0].warehouse);
+                    }
+                    
+                    // 过滤指定仓库的拣货单 - 尝试多个可能的字段名
+                    let filteredRecords = allRecords.filter(record => {
+                        const warehouseCodeMatch = record.warehouse_code === warehouseCode;
+                        const warehouseMatch = record.warehouse === warehouseCode;
+                        console.log(`记录 ${record.picking_no}: warehouse_code=${record.warehouse_code}, warehouse=${record.warehouse}, 匹配结果: ${warehouseCodeMatch || warehouseMatch}`);
+                        return warehouseCodeMatch || warehouseMatch;
+                    });
+                    
+                    // 根据页面类型进行过滤
+                    if (isSkuPack) {
+                        // 按SKU打包页面：只显示一票一件的拣货单
+                        filteredRecords = filteredRecords.filter(record => 
+                            record.picking_type === '0' || record.picking_type_name === '一票一件'
+                        );
+                        console.log(`按SKU打包页面，过滤后剩余 ${filteredRecords.length} 条一票一件记录`);
+                    } else if (isSorting) {
+                        // 二次分拣页面：显示除了一票一件之外的其他拣货单
+                        filteredRecords = filteredRecords.filter(record => 
+                            record.picking_type !== '0' && record.picking_type_name !== '一票一件'
+                        );
+                        console.log(`二次分拣页面，过滤后剩余 ${filteredRecords.length} 条非一票一件记录`);
+                    }
+                    
+                    // 提取拣货单号和类别信息
+                    const pickingCodes = filteredRecords.map(record => ({
+                        code: record.picking_no,
+                        type: record.picking_type_name || this.getPickingTypeName(record.picking_type),
+                        displayText: `${record.picking_no} - [${record.picking_type_name || this.getPickingTypeName(record.picking_type)}]`
+                    }));
+                    
+                    console.log(`仓库 ${warehouseCode} 的拣货单数量: ${pickingCodes.length}`);
+                    console.log('拣货单列表:', pickingCodes);
+                    
+                    resolve(pickingCodes);
+                };
+
+                getAllRequest.onerror = (event) => {
+                    console.error('❌ 查询拣货单列表失败:', event.target.error);
+                    reject(new Error('查询拣货单列表失败: ' + (event.target.error ? event.target.error.message : '未知错误')));
+                };
+
+                transaction.oncomplete = () => {
+                    console.log('数据库查询事务完成，关闭连接');
+                    db.close();
+                };
+            }).catch(error => {
+                console.error('❌ 打开数据库失败:', error);
+                reject(error);
+            });
+        });
     }
 }; 

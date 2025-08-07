@@ -72,6 +72,24 @@ const MessageHandler = {
                 }
             });
             return true;
+        } else if (request.action === 'getPickingCodesByWarehouse') {
+            // 根据仓库ID获取拣货单列表
+            Database.getPickingCodesByWarehouse(request.warehouseId, request.isSkuPack, request.isSorting)
+                .then((pickingCodes) => {
+                    console.log(`✅ 获取仓库 ${request.warehouseId} 的拣货单列表成功，共 ${pickingCodes.length} 个`);
+                    sendResponse({ 
+                        success: true, 
+                        data: pickingCodes 
+                    });
+                })
+                .catch(error => {
+                    console.error(`❌ 获取仓库 ${request.warehouseId} 的拣货单列表失败:`, error);
+                    sendResponse({ 
+                        success: false, 
+                        error: error.message 
+                    });
+                });
+            return true;
         } else if (request.action === 'deleteDatabase') {
             // 删除数据库
             Database.deleteDB()

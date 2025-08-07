@@ -122,9 +122,88 @@ function initializeInputHandlers() {
     if (input && pickingInput) {
         console.log('初始化输入处理程序');
         setupSKUInputSanitizer(input);
+        
+        // 初始化拣货单选择器
+        initializePickingCodeSelector();
+        
         return true;
     }
     return false;
+}
+
+/**
+ * 检测当前是否为按SKU打包页面
+ * @returns {boolean} 是否为按SKU打包页面
+ */
+function isSkuPackPage() {
+    // 检测URL中的quick参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const quickParam = urlParams.get('quick');
+    
+    // 检测页面标题或菜单项
+    const skuPackLink = document.querySelector('a[onclick*="按SKU打包"]');
+    const isSkuPackPage = skuPackLink && skuPackLink.classList.contains('active');
+    
+    return quickParam === '103' || isSkuPackPage;
+}
+
+/**
+ * 检测当前是否为二次分拣页面
+ * @returns {boolean} 是否为二次分拣页面
+ */
+function isSortingPage() {
+    // 检测URL中的quick参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const quickParam = urlParams.get('quick');
+    
+    // 检测页面标题或菜单项
+    const sortingLink = document.querySelector('a[onclick*="二次分拣"]');
+    const isSortingPage = sortingLink && sortingLink.classList.contains('active');
+    
+    return quickParam === '104' || isSortingPage;
+}
+
+/**
+ * 初始化拣货单选择器
+ */
+async function initializePickingCodeSelector() {
+    console.log('初始化拣货单选择器...');
+    
+    // 检查是否已经初始化过
+    if (window.pickingCodeSelectorInitialized) {
+        console.log('拣货单选择器已经初始化过，跳过');
+        return;
+    }
+    
+    try {
+        // 设置数据库对象
+        PickingCodeSelector.setDatabase(Database);
+        
+        // 获取当前仓库ID和页面类型（使用带回退的方法）
+        const warehouseId = await WarehouseManager.getWarehouseIdWithFallback();
+        const isSkuPack = isSkuPackPage();
+        const isSorting = isSortingPage(); // 新增：检测二次分拣页面
+        console.log('当前仓库ID:', warehouseId, '是否按SKU打包页面:', isSkuPack, '是否二次分拣页面:', isSorting);
+        
+        // 初始化拣货单选择器，传递页面类型
+        PickingCodeSelector.init(warehouseId, isSkuPack, isSorting);
+        
+        // 监听仓库变化
+        WarehouseManager.onWarehouseChange(async (newWarehouseId) => {
+            console.log('仓库发生变化，新仓库ID:', newWarehouseId);
+            const currentIsSkuPack = isSkuPackPage();
+            const currentIsSorting = isSortingPage();
+            // 更新拣货单选择器
+            PickingCodeSelector.init(newWarehouseId, currentIsSkuPack, currentIsSorting);
+        });
+        
+        // 标记为已初始化
+        window.pickingCodeSelectorInitialized = true;
+        
+        console.log('拣货单选择器初始化完成');
+    } catch (error) {
+        console.error('初始化拣货单选择器失败:', error);
+    }
 }
 
 /**
