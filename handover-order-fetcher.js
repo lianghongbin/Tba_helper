@@ -25,13 +25,14 @@ const HandoverOrderFetcher = {
      */
     processHandoverData(data) {
         return data.map(item => ({
+            id: item.E0 || 0,
             pickingCode: item.picking_code || '',
             pickingType: item.E16 || '',
             pickingTypeName: this.getPickingTypeName(item.E16 || ''),
             orderProduct: (item.order_product || []).map(product => ({
                 orderId: product.order_id || '',
                 quantity: product.op_quantity || '',
-                skuCode: product.product_barcode || ''
+                productBarcode: product.product_barcode || ''
             }))
         }));
     },
@@ -43,11 +44,12 @@ const HandoverOrderFetcher = {
      * @param {string} orderType - 订单状态
      * @param {string} pickingType - 标签类别
      * @param {string} pickingCode - 拣货单编号
+     * @param {string} productSku - 产品编码
      * @returns {Promise<Array>} - 处理后的交接班数据数组
      */
-    async fetchHandoverData(dateFor, warehouseCode = '1', orderType = '1',  pickingType = '1', pickingCode = '') {
-        if (!dateFor) {
-            throw new Error('日期参数不能为空');
+    async fetchHandoverData(pickingCode = '', productSku = '', warehouseCode = '1',  dateFor, pickingType = '1',  orderType = '1') {
+        if (dateFor==null || dateFor === '') {
+            dateFor = new Date().toString();
         }
 
         console.log(`开始获取 ${dateFor} 的交接班数据...`);
@@ -58,13 +60,16 @@ const HandoverOrderFetcher = {
         const params = new URLSearchParams();
         params.append('E16', orderType);  //订单状态： 空是所有；1、未打包；2、未签出
         params.append('E4', warehouseCode);   //仓库：1是一号仓，2是二号仓
-        params.append('E016', pickingType)   //拣货单类别：空是所有，0：一票一件；1：一票一件多个
+        params.append('E016', pickingType)   //拣货单类别：空是所有，0：一票一件；1：一票一件多个和一票多件
         params.append('pickingCodeSearchType', '1');    //拣货单搜索方式： 1、精准匹配；2、模糊匹配
         params.append('picking_code', pickingCode);
         params.append('searchDateType', 'createDate');
         params.append('dateFor', dateFor);
         params.append('sort_type', 'add_time');
         params.append('has_tracking_number', '0');
+        if (productSku != null) {
+            params.append('product_code', productSku);
+        }
 
         try {
             const response = await fetch(url, {
@@ -108,6 +113,47 @@ const HandoverOrderFetcher = {
         const today = new Date();
         const dateFor = today.toISOString().slice(0, 19).replace('T', ' ');
         return this.fetchHandoverData(dateFor);
+    },
+
+    /**
+     * 根据产品条码查找一票一件多个拣货单中的订单信息（返回最新的一条）
+     * @param {string} productBarcode - 产品条码
+     * @param {boolean} isUnpacked - 是否查找未打单，true为未打单，false为未签出
+     * @param {string} dateFor - 日期，格式：YYYY-MM-DD HH:mm:ss，可选
+     * @param {string} warehouseCode - 仓库编码，默认为 '1'
+     * @returns {Promise<Object|null>} - 找到的最新订单信息，如果没找到返回null
+     */
+    async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '1') {
+        if (!productBarcode) {
+            throw new Error('产品条码不能为空');
+        }
+
+        console.log(`开始查找产品条码 ${productBarcode} 的最新订单信息`);
+
+        try {
+   
+            // 直接调用fetchHandoverData获取所有数据
+            const allHandoverData = await this.fetchHandoverData(
+                pickingCode = '',
+                productBarcode,
+                '2'
+            );
+
+            if (allHandoverData == nullallHandoverData.length === 0) {
+                console.log(`未找到产品条码 ${productBarcode} 的订单信息`);
+                return null;
+            }
+
+            // 根据id倒序排序，取最上面（最新）的一条
+            allHandoverData.sort((a, b) => b.id - a.id);
+            const latestOrder = allHandoverData[0];
+            
+            console.log(`找到 ${matchingOrders.length} 条匹配记录，返回最新的:`, latestOrder);
+            return latestOrder;
+        } catch (error) {
+            console.error(`查找产品条码 ${productBarcode} 的订单信息失败:`, error);
+            throw error;
+        }
     }
 };
 
