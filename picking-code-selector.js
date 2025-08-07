@@ -96,7 +96,7 @@ const PickingCodeSelector = {
         dropdownContainer.id = 'pickingCodeDropdown';
         dropdownContainer.style.cssText = `
             position: fixed;
-            z-index: 999999;
+            z-index: 100;
             display: none;
             background: white;
             border: 1px solid #ccc;
@@ -113,13 +113,13 @@ const PickingCodeSelector = {
         const newInput = document.createElement('input');
         newInput.id = 'pickingCode';
         newInput.type = 'text';
-        newInput.placeholder = '请输入或选择拣货单';
+        newInput.placeholder = '请输入或选择拣货单号';
         newInput.className = existingInput.className;
         newInput.style.cssText = existingInput.style.cssText + '; position: relative;';
         
         // 创建包装容器
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; display: inline-block; width: 250px; z-index: 999999;';
+        wrapper.style.cssText = 'position: relative; display: inline-block; width: 250px; z-index: 100;';
         wrapper.appendChild(newInput);
         wrapper.appendChild(dropdownContainer);
         

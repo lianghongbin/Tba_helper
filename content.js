@@ -123,8 +123,13 @@ function initializeInputHandlers() {
         console.log('初始化输入处理程序');
         setupSKUInputSanitizer(input);
         
-        // 初始化拣货单选择器
-        initializePickingCodeSelector();
+        // 只在拣货单选择器未初始化时才初始化
+        if (!window.pickingCodeSelectorInitialized) {
+            console.log('拣货单选择器未初始化，开始初始化');
+            initializePickingCodeSelector();
+        } else {
+            console.log('拣货单选择器已初始化，跳过重复初始化');
+        }
         
         return true;
     }
@@ -278,9 +283,6 @@ function setupObservers() {
             menuReady = !!menuElement;
         }
 
-        // 尝试创建错误提示Label
-        createErrorLabel();
-
         if (inputsReady && menuReady) {
             console.log('所有目标元素已初始化，断开观察器');
             if (observer) {
@@ -306,8 +308,6 @@ function handleRouteChange() {
     setupObservers();
     initializeInputHandlers();
     initializeShipmentMenuHandler();
-    createErrorLabel();
-    setupDialogInterceptor();
     modifyBatchPackDisplayLogic();
     
     // 安全地执行jQuery相关操作
@@ -342,119 +342,6 @@ function setupSPAListener() {
         originalReplaceState.apply(this, args);
         handleRouteChange();
     };
-}
-
-/**
- * 创建错误提示Label
- */
-function createErrorLabel() {
-    const confirmBtn = document.querySelector('input[value="确认"].baseBtn.submitProduct');
-    if (confirmBtn && !document.getElementById('custom-error-label')) {
-        console.log('创建错误提示Label');
-        const errorLabel = document.createElement('label');
-        errorLabel.id = 'custom-error-label';
-        errorLabel.className = 'custom-error-message';
-        errorLabel.style.cssText = `
-            color: #d32f2f;
-            font-size: 18px;
-            font-weight: bold;
-            margin-left: 20px;
-            display: none;
-            vertical-align: middle;
-            font-family: Arial, sans-serif;
-        `;
-        confirmBtn.parentNode.insertBefore(errorLabel, confirmBtn.nextSibling);
-        console.log('错误提示Label创建完成');
-    }
-}
-
-/**
- * 显示自定义错误信息
- */
-function showCustomError(errorText) {
-    const errorLabel = document.getElementById('custom-error-label');
-    if (errorLabel) {
-        errorLabel.textContent = errorText;
-        errorLabel.style.display = 'inline';
-        console.log('显示错误信息:', errorText);
-    }
-}
-
-/**
- * 隐藏自定义错误信息
- */
-function hideCustomError() {
-    const errorLabel = document.getElementById('custom-error-label');
-    if (errorLabel) {
-        errorLabel.style.display = 'none';
-        console.log('隐藏错误信息');
-    }
-}
-
-/**
- * 测试错误提示Label（临时函数，用于调试）
- */
-function testErrorLabel() {
-    console.log('测试错误提示Label');
-    createErrorLabel();
-    setTimeout(() => {
-        showCustomError('测试错误信息：产品代码:123456 未找到匹配未完成的订单');
-    }, 1000);
-}
-
-
-/**
- * 设置弹框拦截器
- */
-function setupDialogInterceptor() {
-    console.log('设置弹框拦截器');
-    // 使用定时器检查错误弹框，避免创建新的MutationObserver
-    setInterval(() => {
-        const errorDialog = document.querySelector('#dialog-auto-alert-tip');
-        if (errorDialog) {
-            const computedStyle = window.getComputedStyle(errorDialog);
-            const isVisible = computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden';
-            
-            if (isVisible) {
-                console.log('检测到错误弹框，开始拦截');
-                handleErrorDialog(errorDialog);
-            }
-        }
-    }, 500);
-}
-
-/**
- * 处理错误弹框
- */
-function handleErrorDialog(dialog) {
-    console.log('处理错误弹框');
-    
-    // 隐藏原弹框
-    dialog.style.display = 'none';
-    
-    // 提取错误信息 - 尝试多种选择器
-    let errorMessage = dialog.querySelector('.tip-error-message');
-    if (!errorMessage) {
-        errorMessage = dialog.querySelector('p span');
-    }
-    if (!errorMessage) {
-        errorMessage = dialog.querySelector('p');
-    }
-    
-    if (errorMessage) {
-        const errorText = errorMessage.textContent.trim();
-        console.log('提取的错误信息:', errorText);
-        
-        // 显示自定义错误信息
-        showCustomError(errorText);
-        
-        // 保持输入框焦点和选中状态
-        maintainInputFocus();
-    } else {
-        console.log('未找到错误信息元素，使用默认错误信息');
-        showCustomError('产品代码未找到匹配未完成的订单');
-        maintainInputFocus();
-    }
 }
 
 /**
@@ -501,14 +388,6 @@ function init() {
     const inputsReady = initializeInputHandlers();
     const menuReady = initializeShipmentMenuHandler();
 
-    // 创建错误提示Label
-    createErrorLabel();
-
-    // 设置弹框拦截器
-    setupDialogInterceptor();
-
-
-
     // 修改批量打包按钮显示逻辑
     modifyBatchPackDisplayLogic();
     
@@ -527,8 +406,6 @@ function init() {
             }
         );
     });
-
-
 
     if (!inputsReady || !menuReady) {
         setupObservers();
@@ -751,10 +628,6 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 
 // 全局测试函数，可在控制台中直接调用
 window.testTBAHelper = {
-    testErrorLabel: testErrorLabel,
-    showError: (text) => showCustomError(text || '测试错误信息'),
-    hideError: hideCustomError,
-    createLabel: createErrorLabel,
     resetDailyCheck: () => {
         dailyFetchChecked = false;
         localStorage.removeItem('tba_last_fetch_check_date');
