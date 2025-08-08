@@ -65,7 +65,7 @@ const HandoverOrderFetcher = {
      * @param {string} productSku - 产品编码
      * @returns {Promise<Array>} - 处理后的交接班数据数组
      */
-    async fetchHandoverData(pickingCode = '', productSku = '', warehouseCode = '1', pickingType = '1', dateFor, orderType = '0') {
+    async fetchHandoverData(pickingCode = '', productSku = '', warehouseCode = '1', pickingType = '1', dateFor = '', orderType = '0') {
         if (dateFor == null || dateFor === '') {
             dateFor = Utils.getCurrentDate();
         }
@@ -116,7 +116,6 @@ const HandoverOrderFetcher = {
                     'Accept': 'application/json, text/javascript, */*; q=0.01',
                     'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
                     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-                    'Referer': 'https://yzt.wms.yunwms.com/shipment/close-report/list?quick=113&__token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTQ2MTI1MDMsImV4cCI6MTc1NDY5ODkwMywidXNlcklkIjoiNCIsInVzZXJDb2RlIjoi5LuT5bqT5Li7566hIiwidGVuYW50SWQiOiJ5enQiLCJzeXNDb21wYW55Q29kZSI6Im50ZXhqcnEiLCJzeXN0ZW1Db21wYW55Q29kZSI6Im50ZXhqcnEiLCJzeXN0ZW1UeXBlIjoiV01TIn0.U4cuU0x9I_AZC_6kpcPoDTyunT4LjQ6kCSsGYFQWLt4&__tenant_id=yzt&__sys_company_code=ntexjrq',
                     'Origin': 'https://yzt.wms.yunwms.com',
                     'Sec-Fetch-Site': 'same-origin',
                     'Sec-Fetch-Mode': 'cors',
