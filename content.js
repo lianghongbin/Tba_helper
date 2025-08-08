@@ -410,6 +410,14 @@ function init() {
     if (!inputsReady || !menuReady) {
         setupObservers();
     }
+    
+    // 启动公共标签监听器
+    if (typeof FixkingPublicLabel !== 'undefined') {
+        FixkingPublicLabel.startDialogListener();
+        console.log('公共标签监听器已启动');
+    } else {
+        console.error('FixkingPublicLabel 未加载');
+    }
 }
 
 /**
