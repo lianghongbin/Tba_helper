@@ -45,6 +45,19 @@ class ErrorPromptHandler {
                 alert('系统错误：无法显示错误信息，请联系管理员');
             }
 
+            //自动查找 一票一件多个中是否有该 barcode
+            const result = await this.autoSelectPicking(productBarcode);
+            if (result == null) {
+                console.log('info', '没有找到该产品的一票一件多个的订单');
+                return;
+            }
+
+            const oneLabelOneItemMulti = result['oneLabelOneItemMulti'][0];
+
+            //接下来调用二次分拣页面的功能，将拣货单和 barcode填入到二次分拣的页面直接打印
+
+
+
             // 如果有产品条码，执行相关业务逻辑
             if (productBarcode) {
                 const result = await this.executeProductBarcodeLogic(productBarcode);
@@ -78,7 +91,7 @@ class ErrorPromptHandler {
 
             // 调用 HandoverOrderFetcher 查找最新订单
             if (window.xAI && window.xAI.HandoverOrderFetcher) {
-                const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode);
+                const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode, '2', '01');
                 this.log('info', 'findLatestOrderByProductBarcode 返回结果:', result);
 
                 // 自定义业务逻辑：查询库存
@@ -126,14 +139,18 @@ class ErrorPromptHandler {
     /**
      * 根据 barcode自动选择拣货单
      * @param {string} product_barcode - 商品 barcode
+     * @return [{'oneLabelOneItem': oneLabelOneItem}, {'oneLabelOneItemMulti': oneLabelOneItemMulti}];
      */
     async autoSelectPicking(product_barcode) {
-        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '0');
+        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '01');
         if (result == null) {
             return null;
         }
 
-        return null;
+        const oneLabelOneItem =  result.filter(item =>(item.pickingType === '0')).sort((itemA, itemB) => itemA.id - itemB.id);
+        const oneLabelOneItemMulti =  result.filter(item =>(item.pickingType === '1')).sort((itemA, itemB) => itemA.id - itemB.id);
+
+        return [{'oneLabelOneItem': oneLabelOneItem}, {'oneLabelOneItemMulti': oneLabelOneItemMulti}];
     }
 
     /**

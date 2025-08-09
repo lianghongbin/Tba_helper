@@ -21,7 +21,7 @@ const HandoverOrderFetcher = {
     /**
      * 处理交接班数据
      * @param {Array} data - 原始数据数组
-     * @param {string} pickingType - 订单类别
+     * @param {string} pickingType - 订单类别: 空：全部； 01:一票一件和一票一件多个； 0:一票一件; 1：一票一件多个; 2：一票多个
      * @returns {Array} - 处理后的数据数组
      */
     processHandoverData(data, pickingType) {
@@ -37,9 +37,9 @@ const HandoverOrderFetcher = {
                     productBarcode: product.product_barcode || ''
                 }))
             }));
-        } else {
+        } else if (pickingType ==='01') {
             return data
-                .filter(item => item.E16 === pickingType)
+                .filter(item => (item.E16 === '0' || item.E16 === '1'))
                 .map(item => ({
                 id: item.E0 || 0,
                 pickingCode: item.picking_code || '',
@@ -52,6 +52,20 @@ const HandoverOrderFetcher = {
                 }))
             }));
         }
+
+        return data
+            .filter(item => (item.E16 === pickingType))
+            .map(item => ({
+                id: item.E0 || 0,
+                pickingCode: item.picking_code || '',
+                pickingType: item.E16 || '',
+                pickingTypeName: this.getPickingTypeName(item.E16 || ''),
+                orderProduct: (item.order_product || []).map(product => ({
+                    orderId: product.order_id || '',
+                    quantity: product.op_quantity || '',
+                    productBarcode: product.product_barcode || ''
+                }))
+            }));
     },
 
     /**
@@ -155,7 +169,8 @@ const HandoverOrderFetcher = {
      * @param {string} productBarcode - 产品条码
      * @param {string} warehouseCode - 仓库编码， '2'
      * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1
-     * @returns {Promise<Object|null>} - 找到的最新订单信息，如果没找到返回null
+     * @returns {Promise<[{id, pickingCode, pickingType, pickingTypeName, orderProduct:[{orderId, quantity, productBarcode}]}]|null>} - 找到的最新订单信息，如果没找到返回null
+     *
      */
     async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '2', pickingType = '1') {
         if (!productBarcode) {
