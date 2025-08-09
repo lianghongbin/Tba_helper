@@ -215,7 +215,15 @@ const HandoverOrderFetcher = {
     }
 };
 
-// 如果在Node.js环境中，导出模块
+// 挂到全局，供其它脚本访问（兼容两种命名空间）
+if (typeof window !== 'undefined') {
+    window.HandoverOrderFetcher = HandoverOrderFetcher;
+    window.xAI = window.xAI || {};
+    window.xAI.HandoverOrderFetcher = HandoverOrderFetcher;
+}
+
+// 保持同步挂载到全局（已在上方 window.HandoverOrderFetcher = HandoverOrderFetcher）
+// Node 环境导出
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = HandoverOrderFetcher;
-} 
+}

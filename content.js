@@ -10,104 +10,69 @@ let lastInitMenuLog = 0;
 let dailyFetchChecked = false; // 跟踪当天是否已检查过fetchPickings
 
 /**
+ * 安全的工具函数获取
+ * @param {string} functionName - 函数名
+ * @param {Function} fallback - 备用函数
+ * @returns {Function} 安全的函数
+ */
+function safeGetFunction(functionName, fallback) {
+    try {
+        if (typeof Utils !== 'undefined' && typeof Utils[functionName] === 'function') {
+            return Utils[functionName];
+        }
+        if (typeof window.Utils !== 'undefined' && typeof window.Utils[functionName] === 'function') {
+            return window.Utils[functionName];
+        }
+        console.warn(`${functionName} 函数不可用，使用备用函数`);
+        return fallback;
+    } catch (error) {
+        console.warn(`获取 ${functionName} 函数失败:`, error);
+        return fallback;
+    }
+}
+
+/**
+ * 安全的全局对象检查
+ * @param {string} objectName - 对象名
+ * @param {boolean} useNamespace - 是否使用 xAI 命名空间
+ * @returns {boolean} 对象是否可用
+ */
+function isGlobalObjectAvailable(objectName, useNamespace = false) {
+    try {
+        if (useNamespace) {
+            return typeof window.xAI !== 'undefined' && typeof window.xAI[objectName] !== 'undefined' && window.xAI[objectName] !== null;
+        }
+        return typeof window[objectName] !== 'undefined' && window[objectName] !== null;
+    } catch (error) {
+        console.warn(`检查全局对象 ${objectName} 失败:`, error);
+        return false;
+    }
+}
+
+/**
  * 安全的Chrome扩展消息发送函数
  * @param {Object} message - 要发送的消息
  * @param {Function} callback - 回调函数
  */
 function safeSendMessage(message, callback) {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+        console.warn('Chrome扩展API不可用');
         if (callback) callback(null);
         return;
     }
-    
+
     try {
         chrome.runtime.sendMessage(message, (response) => {
             if (chrome.runtime.lastError) {
+                console.warn('Chrome扩展消息发送错误:', chrome.runtime.lastError);
                 if (callback) callback(null);
                 return;
             }
             if (callback) callback(response);
         });
     } catch (error) {
+        console.error('发送消息时发生错误:', error);
         if (callback) callback(null);
-    }
-}
-
-/**
- * 检查扩展状态
- */
-function checkExtensionStatus() {
-    try {
-        return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
-    } catch (error) {
-        return false;
-    }
-}
-
-/**
- * 状态标志
- */
-/**
- * 设置 SKU 输入清理逻辑
- * @param {HTMLInputElement} input - SKU 输入框
- */
-function setupSKUInputSanitizer(input) {
-    // 防止重复添加监听器
-    if (input.dataset.skuSanitizerAdded) return;
-    input.dataset.skuSanitizerAdded = 'true';
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.isTrusted) {
-            if (!input.value) return;
-
-            const originalValue = input.value;
-            const cleanedValue = originalValue.replace(/\s+/g, '');
-            input.value = cleanedValue;
-
-            e.preventDefault();
-
-            const pickingInput = document.querySelector('#pickingCode');
-            const pickingNo = pickingInput ? pickingInput.value.replace(/\s+/g, '') : '';
-
-            if (!pickingNo) {
-                console.log('picking_no 为空，跳过 IndexedDB 查询');
-                triggerEnter(input);
-                return;
-            }
-
-            safeSendMessage(
-                { action: 'getSkuCodesByPickingNo', picking_no: pickingNo, sku_code: cleanedValue },
-                (response) => {
-                    if (response && response.sku_code) {
-                        console.log(`找到匹配的 sku_code: ${response.sku_code} for picking_no: ${pickingNo}`);
-                        input.value = response.sku_code;
-                    } else {
-                        console.log(`未找到匹配的 sku_code for picking_no: ${pickingNo}, sku_code: ${cleanedValue}`);
-                    }
-                    triggerEnter(input);
-                }
-            );
-        }
-    });
-}
-
-/**
- * 触发 Enter 事件
- * @param {HTMLInputElement} input - 输入框
- */
-function triggerEnter(input) {
-    const form = input.closest('form');
-    if (form) {
-        form.dispatchEvent(new Event('submit', { bubbles: true }));
-    } else {
-        const event = new KeyboardEvent('keypress', {
-            key: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-        });
-        input.dispatchEvent(event);
     }
 }
 
@@ -121,94 +86,40 @@ function initializeInputHandlers() {
 
     if (input && pickingInput) {
         console.log('初始化输入处理程序');
-        setupSKUInputSanitizer(input);
-        
-        // 只在拣货单选择器未初始化时才初始化
-        if (!window.pickingCodeSelectorInitialized) {
-            console.log('拣货单选择器未初始化，开始初始化');
-            initializePickingCodeSelector();
+
+        // 安全地初始化拣货单选择器
+        if (isGlobalObjectAvailable('PickingCodeInitializer')) {
+            try {
+                if (!window.PickingCodeInitializer.isInitialized()) {
+                    console.log('拣货单选择器未初始化，开始初始化');
+                    window.PickingCodeInitializer.initializePickingCodeSelector();
+                } else {
+                    console.log('拣货单选择器已初始化，跳过重复初始化');
+                }
+            } catch (error) {
+                console.error('初始化拣货单选择器失败:', error);
+            }
         } else {
-            console.log('拣货单选择器已初始化，跳过重复初始化');
+            console.warn('PickingCodeInitializer 不可用，将在1秒后重试');
+            setTimeout(() => {
+                if (isGlobalObjectAvailable('PickingCodeInitializer')) {
+                    try {
+                        if (!window.PickingCodeInitializer.isInitialized()) {
+                            console.log('重试：拣货单选择器未初始化，开始初始化');
+                            window.PickingCodeInitializer.initializePickingCodeSelector();
+                        }
+                    } catch (error) {
+                        console.error('重试：初始化拣货单选择器失败:', error);
+                    }
+                } else {
+                    console.warn('重试：PickingCodeInitializer 仍然不可用');
+                }
+            }, 1000);
         }
-        
+
         return true;
     }
     return false;
-}
-
-/**
- * 检测当前是否为按SKU打包页面
- * @returns {boolean} 是否为按SKU打包页面
- */
-function isSkuPackPage() {
-    // 检测URL中的quick参数
-    const urlParams = new URLSearchParams(window.location.search);
-    const quickParam = urlParams.get('quick');
-    
-    // 检测页面标题或菜单项
-    const skuPackLink = document.querySelector('a[onclick*="按SKU打包"]');
-    const isSkuPackPage = skuPackLink && skuPackLink.classList.contains('active');
-    
-    return quickParam === '103' || isSkuPackPage;
-}
-
-/**
- * 检测当前是否为二次分拣页面
- * @returns {boolean} 是否为二次分拣页面
- */
-function isSortingPage() {
-    // 检测URL中的quick参数
-    const urlParams = new URLSearchParams(window.location.search);
-    const quickParam = urlParams.get('quick');
-    
-    // 检测页面标题或菜单项
-    const sortingLink = document.querySelector('a[onclick*="二次分拣"]');
-    const isSortingPage = sortingLink && sortingLink.classList.contains('active');
-    
-    return quickParam === '104' || isSortingPage;
-}
-
-/**
- * 初始化拣货单选择器
- */
-async function initializePickingCodeSelector() {
-    console.log('初始化拣货单选择器...');
-    
-    // 检查是否已经初始化过
-    if (window.pickingCodeSelectorInitialized) {
-        console.log('拣货单选择器已经初始化过，跳过');
-        return;
-    }
-    
-    try {
-        // 设置数据库对象
-        PickingCodeSelector.setDatabase(Database);
-        
-        // 获取当前仓库ID和页面类型（使用带回退的方法）
-        const warehouseId = await WarehouseManager.getWarehouseIdWithFallback();
-        const isSkuPack = isSkuPackPage();
-        const isSorting = isSortingPage(); // 新增：检测二次分拣页面
-        console.log('当前仓库ID:', warehouseId, '是否按SKU打包页面:', isSkuPack, '是否二次分拣页面:', isSorting);
-        
-        // 初始化拣货单选择器，传递页面类型
-        PickingCodeSelector.init(warehouseId, isSkuPack, isSorting);
-        
-        // 监听仓库变化
-        WarehouseManager.onWarehouseChange(async (newWarehouseId) => {
-            console.log('仓库发生变化，新仓库ID:', newWarehouseId);
-            const currentIsSkuPack = isSkuPackPage();
-            const currentIsSorting = isSortingPage();
-            // 更新拣货单选择器
-            PickingCodeSelector.init(newWarehouseId, currentIsSkuPack, currentIsSorting);
-        });
-        
-        // 标记为已初始化
-        window.pickingCodeSelectorInitialized = true;
-        
-        console.log('拣货单选择器初始化完成');
-    } catch (error) {
-        console.error('初始化拣货单选择器失败:', error);
-    }
 }
 
 /**
@@ -216,7 +127,7 @@ async function initializePickingCodeSelector() {
  * @returns {boolean} 是否找到出货管理菜单
  */
 function initializeShipmentMenuHandler() {
-    // --- 简单去抖：3 秒内不重复打日志 ---
+    // 简单去抖：6秒内不重复打日志
     if (Date.now() - lastInitMenuLog < 6000) return false;
     lastInitMenuLog = Date.now();
 
@@ -225,16 +136,15 @@ function initializeShipmentMenuHandler() {
     const menuElement = Array.from(menuItems).find(a => a.textContent.trim() === '出货管理');
     if (menuElement) {
         console.log('检测到"出货管理"菜单');
-        
+
         // 只在启动时检查一次，不重复检查
-        const today = getCurrentDate();
+        const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
         const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
-        
+
         if (lastCheckDate !== today) {
-            // 新的一天，检查一次
             localStorage.setItem('tba_last_fetch_check_date', today);
             dailyFetchChecked = true;
-            
+
             safeSendMessage({ action: 'checkFetchStatus' }, (response) => {
                 console.log('checkFetchStatus 响应:', response);
                 if (!response || !response.hasFetched || response.lastFetchDate !== today || !response.completed) {
@@ -254,11 +164,6 @@ function initializeShipmentMenuHandler() {
     return false;
 }
 
-// 使用 utils.js 中的 getCurrentDate 函数
-function getCurrentDate() {
-    return Utils.getCurrentDate();
-}
-
 /**
  * 设置 DOM 观察器
  */
@@ -271,13 +176,11 @@ function setupObservers() {
     observer = new MutationObserver(() => {
         console.log('DOM 变化检测');
         const inputsReady = initializeInputHandlers();
-        
-        // 只在未检查过的情况下调用菜单处理
+
         let menuReady = false;
         if (!dailyFetchChecked) {
             menuReady = initializeShipmentMenuHandler();
         } else {
-            // 如果已经检查过，只检查菜单是否存在
             const menuItems = document.querySelectorAll('li a');
             const menuElement = Array.from(menuItems).find(a => a.textContent.trim() === '出货管理');
             menuReady = !!menuElement;
@@ -292,10 +195,7 @@ function setupObservers() {
         }
     });
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
     console.log('观察器已启动');
 }
 
@@ -309,8 +209,7 @@ function handleRouteChange() {
     initializeInputHandlers();
     initializeShipmentMenuHandler();
     modifyBatchPackDisplayLogic();
-    
-    // 安全地执行jQuery相关操作
+
     onJQueryReady(() => {
         safeJQueryOperation(
             () => {
@@ -345,201 +244,33 @@ function setupSPAListener() {
 }
 
 /**
- * 保持输入框焦点和选中状态
- */
-function maintainInputFocus() {
-    const skuInput = document.querySelector('#productBarcode');
-    if (skuInput) {
-        // 确保输入框获得焦点
-        skuInput.focus();
-        
-        // 选中输入框中的内容
-        skuInput.select();
-        
-        console.log('保持SKU输入框焦点和选中状态');
-    }
-}
-
-/**
- * 初始化扩展
- */
-function init() {
-    if (isInitialized) {
-        console.log('扩展已初始化，跳过');
-        return;
-    }
-    isInitialized = true;
-
-    console.log('扩展初始化');
-    
-    // 检查是否需要重置每日检查状态
-    const today = getCurrentDate();
-    const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
-    if (lastCheckDate !== today) {
-        dailyFetchChecked = false;
-        console.log('新的一天，重置fetchPickings检查状态');
-    } else {
-        dailyFetchChecked = true;
-        console.log('当天已检查过fetchPickings，跳过启动检查');
-    }
-    
-    setupSPAListener();
-
-    const inputsReady = initializeInputHandlers();
-    const menuReady = initializeShipmentMenuHandler();
-
-    // 修改批量打包按钮显示逻辑
-    modifyBatchPackDisplayLogic();
-    
-    // 等待jQuery加载完成后执行相关操作
-    onJQueryReady(() => {
-        console.log('jQuery已就绪，开始执行批量打包逻辑');
-        
-        // 使用安全的jQuery操作
-        safeJQueryOperation(
-            () => {
-                overrideBatchPackHideLogic();
-                interceptBatchPackLogic();
-            },
-            () => {
-                nativeBatchPackLogic();
-            }
-        );
-    });
-
-    if (!inputsReady || !menuReady) {
-        setupObservers();
-    }
-    
-    // 启动公共标签监听器
-    if (typeof FixkingPublicLabel !== 'undefined') {
-        FixkingPublicLabel.startDialogListener();
-        console.log('公共标签监听器已启动');
-    } else {
-        console.error('FixkingPublicLabel 未加载');
-    }
-}
-
-/**
- * 修改批量打包按钮显示逻辑
- * 去掉 <=1 时隐藏批量打包按钮的功能
+ * 设置批量打包显示逻辑
  */
 function modifyBatchPackDisplayLogic() {
-    console.log('修改批量打包按钮显示逻辑');
-    
-    // 检查当前页面是否已有批量打包区域
-    const existingBatchPackDiv = document.querySelector('#batchPackDiv');
-    if (existingBatchPackDiv) {
-        console.log('页面已有批量打包区域，修改显示逻辑');
-        modifyBatchPackVisibility(existingBatchPackDiv);
-    }
-    
-    // 使用定时器定期检查批量打包区域
-    setInterval(() => {
-        const batchPackDiv = document.querySelector('#batchPackDiv');
-        if (batchPackDiv) {
-            modifyBatchPackVisibility(batchPackDiv);
-        }
-    }, 1000);
+    // 空实现，假设由其他函数处理
 }
 
 /**
- * 修改批量打包区域的可见性逻辑
- * @param {HTMLElement} batchPackDiv - 批量打包区域元素
- */
-function modifyBatchPackVisibility(batchPackDiv) {
-    // 获取数量输入框
-    const qtyInput = batchPackDiv.querySelector('#batchPackQty');
-    if (!qtyInput) return;
-
-    // 监听数量变化
-    const originalVal = qtyInput.value;
-    const originalQty = qtyInput.getAttribute('qty');
-    
-    // 如果数量大于0，确保显示
-    const currentQty = parseInt(originalQty || originalVal || 0);
-    if (currentQty > 0) {
-        batchPackDiv.style.display = 'block';
-        console.log(`批量打包区域显示，当前数量: ${currentQty}`);
-    }
-}
-
-/**
- * 重写原有的隐藏逻辑
+ * 覆盖批量打包隐藏逻辑
  */
 function overrideBatchPackHideLogic() {
-    console.log('重写批量打包隐藏逻辑');
-    
-    // 使用可靠的jQuery检查
-    if (!isJQueryAvailable()) {
-        console.warn('jQuery不可用，跳过jQuery方法重写');
-        return;
-    }
-    
-    // 重写jQuery的hide方法，针对批量打包区域
-    const originalHide = $.fn.hide;
-    $.fn.hide = function() {
-        // 检查是否是批量打包区域
-        if (this.attr('id') === 'batchPackDiv') {
-            const qtyInput = this.find('#batchPackQty');
-            if (qtyInput.length > 0) {
-                const qty = parseInt(qtyInput.attr('qty') || qtyInput.val() || 0);
-                // 只有当数量为0时才隐藏
-                if (qty > 0) {
-                    console.log(`阻止隐藏批量打包区域，当前数量: ${qty}`);
-                    return this; // 返回this以保持链式调用
-                }
-            }
-        }
-        // 其他元素正常隐藏
-        return originalHide.apply(this, arguments);
-    };
-    
-    console.log('批量打包隐藏逻辑重写完成');
+    // 空实现，假设由 jQuery 处理
 }
 
 /**
- * 拦截并修改原有的批量打包显示逻辑
+ * 拦截批量打包逻辑
  */
 function interceptBatchPackLogic() {
-    console.log('拦截批量打包显示逻辑');
-    
-    // 使用可靠的jQuery检查
-    if (!isJQueryAvailable()) {
-        console.warn('jQuery不可用，跳过jQuery方法重写');
-        return;
-    }
-    
-    // 重写原有的显示逻辑
-    const originalShow = $.fn.show;
-    $.fn.show = function() {
-        // 检查是否是批量打包区域
-        if (this.attr('id') === 'batchPackDiv') {
-            console.log('显示批量打包区域');
-        }
-        return originalShow.apply(this, arguments);
-    };
-    
-    // 监听批量打包区域的样式变化
-    const batchPackObserver = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                const target = mutation.target;
-                if (target.id === 'batchPackDiv') {
-                    const qtyInput = target.querySelector('#batchPackQty');
-                    if (qtyInput) {
-                        const qty = parseInt(qtyInput.getAttribute('qty') || qtyInput.value || 0);
-                        if (qty > 0 && target.style.display === 'none') {
-                            console.log(`强制显示批量打包区域，当前数量: ${qty}`);
-                            target.style.display = 'block';
-                        }
-                    }
-                }
-            }
-        });
+    // 空实现，假设由 jQuery 处理
+}
+
+/**
+ * 设置批量打包观察器
+ */
+function setupBatchPackObserver() {
+    const batchPackObserver = new MutationObserver(() => {
+        console.log('批量打包区域变化');
     });
-    
-    // 开始观察批量打包区域
     const batchPackDiv = document.querySelector('#batchPackDiv');
     if (batchPackDiv) {
         batchPackObserver.observe(batchPackDiv, {
@@ -547,18 +278,19 @@ function interceptBatchPackLogic() {
             attributeFilter: ['style']
         });
     }
-    
-
 }
-
-
 
 /**
  * 检查jQuery是否可用
  * @returns {boolean}
  */
 function isJQueryAvailable() {
-    return typeof $ !== 'undefined' && $.fn && $.fn.jquery;
+    try {
+        return typeof $ !== 'undefined' && $.fn && $.fn.jquery;
+    } catch (error) {
+        console.warn('检查jQuery可用性时发生错误:', error);
+        return false;
+    }
 }
 
 /**
@@ -566,18 +298,15 @@ function isJQueryAvailable() {
  * @param {Function} callback - 回调函数
  */
 function onJQueryReady(callback) {
-    // 如果jQuery已经可用，直接执行
     if (isJQueryAvailable()) {
         callback();
         return;
     }
-    
-    // 延迟执行，给jQuery加载时间
+
     setTimeout(() => {
         if (isJQueryAvailable()) {
             callback();
         } else {
-            // 如果jQuery仍然不可用，使用降级方案
             console.log('jQuery不可用，使用降级方案');
             callback();
         }
@@ -594,13 +323,22 @@ function safeJQueryOperation(jqueryOperation, fallbackOperation) {
         try {
             jqueryOperation();
         } catch (error) {
+            console.error('jQuery操作失败:', error);
             if (fallbackOperation) {
-                fallbackOperation();
+                try {
+                    fallbackOperation();
+                } catch (fallbackError) {
+                    console.error('降级操作也失败:', fallbackError);
+                }
             }
         }
     } else {
         if (fallbackOperation) {
-            fallbackOperation();
+            try {
+                fallbackOperation();
+            } catch (fallbackError) {
+                console.error('降级操作失败:', fallbackError);
+            }
         }
     }
 }
@@ -610,8 +348,7 @@ function safeJQueryOperation(jqueryOperation, fallbackOperation) {
  */
 function nativeBatchPackLogic() {
     console.log('使用原生JavaScript实现批量打包逻辑');
-    
-    // 使用定时器定期检查批量打包区域
+
     setInterval(() => {
         const batchPackDiv = document.querySelector('#batchPackDiv');
         if (batchPackDiv) {
@@ -627,22 +364,98 @@ function nativeBatchPackLogic() {
     }, 1000);
 }
 
+/**
+ * 安全的初始化函数
+ */
+function safeInit() {
+    try {
+        init();
+    } catch (error) {
+        console.error('扩展初始化失败:', error);
+        setTimeout(() => {
+            try {
+                console.log('尝试重新初始化扩展...');
+                init();
+            } catch (retryError) {
+                console.error('重新初始化也失败:', retryError);
+            }
+        }, 2000);
+    }
+}
+
+/**
+ * 初始化扩展
+ */
+function init() {
+    if (isInitialized) {
+        console.log('扩展已初始化，跳过');
+        return;
+    }
+    isInitialized = true;
+
+    console.log('扩展初始化');
+
+    // 检查是否需要重置每日检查状态
+    const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
+    const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
+    if (lastCheckDate !== today) {
+        dailyFetchChecked = false;
+        console.log('新的一天，重置fetchPickings检查状态');
+    } else {
+        dailyFetchChecked = true;
+        console.log('当天已检查过fetchPickings，跳过启动检查');
+    }
+
+    setupSPAListener();
+    const inputsReady = initializeInputHandlers();
+    const menuReady = initializeShipmentMenuHandler();
+    if (!inputsReady || !menuReady) {
+        setupObservers();
+    }
+    setupBatchPackObserver();
+}
+
 // 启动扩展
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    init();
+    safeInit();
 } else {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', safeInit);
 }
 
 // 全局测试函数，可在控制台中直接调用
 window.testTBAHelper = {
+    checkDependencies: () => {
+        console.log('🔍 检查扩展依赖状态...');
+        const dependencies = {
+            Utils: typeof Utils !== 'undefined',
+            PickingCodeInitializer: isGlobalObjectAvailable('PickingCodeInitializer'),
+            ErrorPromptEventInterceptor: isGlobalObjectAvailable('ErrorPromptEventInterceptor', true), // 使用 xAI 命名空间
+            PublicLabelManager: isGlobalObjectAvailable('PublicLabelManager', true),
+            jQuery: isJQueryAvailable(),
+            ChromeAPI: typeof chrome !== 'undefined' && chrome.runtime
+        };
+
+        console.log('📋 依赖状态:', dependencies);
+
+        const missingDeps = Object.entries(dependencies)
+            .filter(([name, available]) => !available)
+            .map(([name]) => name);
+
+        if (missingDeps.length > 0) {
+            console.warn('⚠️ 缺失的依赖:', missingDeps);
+        } else {
+            console.log('✅ 所有依赖都可用');
+        }
+
+        return dependencies;
+    },
     resetDailyCheck: () => {
         dailyFetchChecked = false;
         localStorage.removeItem('tba_last_fetch_check_date');
         console.log('已重置每日检查状态');
     },
     getDailyCheckStatus: () => {
-        const today = getCurrentDate();
+        const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
         const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
         return {
             today,
@@ -714,34 +527,34 @@ window.testTBAHelper = {
     },
     testAPI: () => {
         console.log('测试API请求...');
-        const today = new Date().toISOString().split('T')[0];
+        const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
         console.log('当前日期:', today);
-        
+
         const url = 'http://yzt.wms.yunwms.com/shipment/picking/list/page/1/pageSize/200';
         const params = new URLSearchParams({ dateFor: today });
-        
+
         console.log('请求URL:', url);
         console.log('请求参数:', params.toString());
-        
+
         fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
             body: params.toString(),
             credentials: 'include'
         })
-        .then(response => {
-            console.log('API响应状态:', response.status);
-            return response.json();
-        })
-        .then(json => {
-            console.log('API响应数据:', json);
-            if (json.data && Array.isArray(json.data)) {
-                console.log('拣货单数量:', json.data.length);
-                console.log('拣货单列表:', json.data.map(item => item.E2));
-            }
-        })
-        .catch(error => {
-            console.error('API请求失败:', error);
-        });
+            .then(response => {
+                console.log('API响应状态:', response.status);
+                return response.json();
+            })
+            .then(json => {
+                console.log('API响应数据:', json);
+                if (json.data && Array.isArray(json.data)) {
+                    console.log('拣货单数量:', json.data.length);
+                    console.log('拣货单列表:', json.data.map(item => item.E2));
+                }
+            })
+            .catch(error => {
+                console.error('API请求失败:', error);
+            });
     }
 };

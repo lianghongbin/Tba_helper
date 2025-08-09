@@ -162,6 +162,11 @@ const WarehouseManager = {
     }
 };
 
+// 挂到全局，供其它脚本访问
+if (typeof window !== 'undefined') {
+    window.WarehouseManager = WarehouseManager;
+}
+
 // 如果在Node.js环境中，导出模块
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarehouseManager;

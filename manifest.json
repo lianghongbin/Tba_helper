@@ -31,7 +31,21 @@
                 "http://yzt.wms.yunwms.com/*",
                 "https://yzt.wms.yunwms.com/*"
             ],
-            "js": ["utils.js", "database.js", "warehouse-storage.js", "warehouse-manager.js", "picking-code-selector.js", "fixking-public-label.js", "handover-order-fetcher.js", "content.js"],
+            "js": [
+                "utils.js",
+                "database.js",
+                "warehouse-storage.js",
+                "warehouse-manager.js",
+                "handover-order-fetcher.js",
+                "picking-code-selector.js",
+                "picking-code-initializer.js",
+                "public-label.js",
+                "intercept/error-prompt-handler.js",
+                "intercept/error-prompt-event.js",
+                "intercept/product-barcode-event.js",
+                "intercept/product-barcode-handler.js",
+                "content.js"
+            ],
             "run_at": "document_idle",
             "all_frames": true
         }
@@ -44,7 +58,8 @@
                 "warehouse-storage.js",
                 "warehouse-manager.js",
                 "picking-code-selector.js",
-                "fixking-public-label.js",
+                "picking-code-initializer.js",
+
                 "picking-fetcher.js",
                 "message-handler.js",
                 "iframe-injector.js",
@@ -52,6 +67,11 @@
                 "popup-utils.js",
                 "popup-event-handler.js",
                 "popup-main.js",
+                "public-label.js",
+                "intercept/error-prompt-handler.js",
+                "intercept/error-prompt-event.js",
+                "intercept/product-barcode-event.js",
+                "intercept/product-barcode-handler.js",
                 "db-viewer.html",
                 "db-viewer.js"
             ],

@@ -96,17 +96,18 @@ const PickingCodeSelector = {
         dropdownContainer.id = 'pickingCodeDropdown';
         dropdownContainer.style.cssText = `
             position: fixed;
-            z-index: 100;
+            z-index: 100; /* 最高层，避免被站点遮挡 */
             display: none;
-            background: white;
+            background: #fff;
             border: 1px solid #ccc;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
             font-family: Arial, sans-serif;
             font-size: 14px;
             visibility: visible;
             opacity: 1;
-            max-height: 400px;
+            max-height: 50vh;
             overflow-y: auto;
+            pointer-events: auto;
         `;
 
         // 创建新的输入框
@@ -119,13 +120,29 @@ const PickingCodeSelector = {
         
         // 创建包装容器
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; display: inline-block; width: 250px; z-index: 100;';
+        wrapper.style.cssText = 'position: relative; display: inline-block; width: 250px;';
         wrapper.appendChild(newInput);
-        wrapper.appendChild(dropdownContainer);
+        // 将下拉容器挂到 body，使用 fixed 定位，不受父级 z-index/overflow 影响
+        document.body.appendChild(dropdownContainer);
         
         // 添加拣货单选项到下拉列表
         this.populateDropdown(dropdownContainer, pickingCodes);
         
+        // 防止下拉被父容器 overflow:hidden 裁剪
+        dropdownContainer.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true });
+        dropdownContainer.addEventListener('click', (e) => e.stopPropagation());
+        
+        // 工具函数：强制显示/隐藏（支持 !important）
+        function forceShow(el) {
+            el.style.setProperty('position', 'fixed', 'important');
+            el.style.setProperty('z-index', '2147483647', 'important');
+            el.style.setProperty('display', 'block', 'important');
+            el.style.setProperty('background', '#fff', 'important');
+        }
+        function forceHide(el) {
+            el.style.setProperty('display', 'none', 'important');
+        }
+
         // 添加焦点事件，显示所有选项
         newInput.addEventListener('focus', function(e) {
             console.log('焦点事件触发，当前值:', this.value);
@@ -135,30 +152,16 @@ const PickingCodeSelector = {
             
             // 显示下拉选项
             setTimeout(() => {
-                console.log('准备显示下拉选项');
-                console.log('下拉容器存在:', !!dropdownContainer);
-                console.log('下拉容器当前显示状态:', dropdownContainer.style.display);
-                console.log('下拉容器选项数量:', dropdownContainer.children.length);
-                
                 // 重置所有选项的显示状态，确保显示所有选项
                 const options = dropdownContainer.querySelectorAll('.dropdown-option');
-                options.forEach(option => {
-                    option.style.display = 'block';
-                });
-                
-                // 计算下拉容器的位置
+                options.forEach(option => { option.style.display = 'block'; });
+
+                // 计算下拉容器相对视口的位置（fixed 定位）
                 const inputRect = this.getBoundingClientRect();
-                dropdownContainer.style.left = inputRect.left + 'px';
-                dropdownContainer.style.top = (inputRect.bottom + 5) + 'px';
-                dropdownContainer.style.width = inputRect.width + 'px';
-                
-                dropdownContainer.style.display = 'block';
-                
-                // 强制重新计算样式
-                dropdownContainer.offsetHeight;
-                
-                console.log('设置显示后，下拉容器显示状态:', dropdownContainer.style.display);
-                console.log('计算后的显示状态:', window.getComputedStyle(dropdownContainer).display);
+                dropdownContainer.style.left = Math.round(inputRect.left) + 'px';
+                dropdownContainer.style.top = Math.round(inputRect.bottom + 5) + 'px';
+                dropdownContainer.style.width = Math.round(inputRect.width) + 'px';
+                forceShow(dropdownContainer);
             }, 100);
         });
         
@@ -176,11 +179,10 @@ const PickingCodeSelector = {
                 
                 // 计算下拉容器的位置
                 const inputRect = this.getBoundingClientRect();
-                dropdownContainer.style.left = inputRect.left + 'px';
-                dropdownContainer.style.top = (inputRect.bottom + 5) + 'px';
-                dropdownContainer.style.width = inputRect.width + 'px';
-                
-                dropdownContainer.style.display = 'block';
+                dropdownContainer.style.left = Math.round(inputRect.left) + 'px';
+                dropdownContainer.style.top = Math.round(inputRect.bottom + 5) + 'px';
+                dropdownContainer.style.width = Math.round(inputRect.width) + 'px';
+                forceShow(dropdownContainer);
                 console.log('显示下拉选项，选项数量:', dropdownContainer.children.length);
             }, 100);
         });
@@ -207,21 +209,13 @@ const PickingCodeSelector = {
         });
         
         // 添加失去焦点事件，隐藏下拉选项
-        newInput.addEventListener('blur', function(e) {
-            console.log('失去焦点事件触发');
-            
-            // 检查是否点击了下拉选项
-            const relatedTarget = e.relatedTarget;
-            if (relatedTarget && relatedTarget.classList.contains('dropdown-option')) {
-                console.log('点击了下拉选项，不隐藏下拉容器');
-                return;
-            }
-            
-            // 延迟隐藏，让点击选项有时间触发
-            setTimeout(() => {
-                console.log('隐藏下拉容器');
-                dropdownContainer.style.display = 'none';
-            }, 200);
+        // 点击输入框外部时隐藏（因为下拉挂到 body，不能靠 blur 判断）
+        document.addEventListener('click', function onDocClick(ev) {
+            const target = ev.target;
+            if (!target) return;
+            if (target === newInput) return;
+            if (dropdownContainer.contains(target)) return;
+            forceHide(dropdownContainer);
         });
         
         // 标记为已初始化
@@ -335,6 +329,11 @@ const PickingCodeSelector = {
 
 
 };
+
+// 将模块挂到全局，供其它脚本访问
+if (typeof window !== 'undefined') {
+    window.PickingCodeSelector = PickingCodeSelector;
+}
 
 // 如果在Node.js环境中，导出模块
 if (typeof module !== 'undefined' && module.exports) {

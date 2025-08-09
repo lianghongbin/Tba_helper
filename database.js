@@ -447,4 +447,9 @@ const Database = {
             });
         });
     }
-}; 
+};
+
+// 将模块挂载到全局以便其它脚本访问
+if (typeof window !== 'undefined') {
+    window.Database = Database;
+}
