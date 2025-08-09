@@ -124,6 +124,19 @@ class ErrorPromptHandler {
     }
 
     /**
+     * 根据 barcode自动选择拣货单
+     * @param {string} product_barcode - 商品 barcode
+     */
+    async autoSelectPicking(product_barcode) {
+        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '0');
+        if (result == null) {
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
      * 日志输出
      */
     log(level, message, ...args) {

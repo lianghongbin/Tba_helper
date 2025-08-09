@@ -2,7 +2,7 @@
 importScripts(
     'utils.js',
     'database.js',
-    'picking-fetcher.js',
+    'fetcher/picking-fetcher.js',
     'message-handler.js',
     'iframe-injector.js'
 );

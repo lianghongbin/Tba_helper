@@ -25,7 +25,6 @@ const HandoverOrderFetcher = {
      * @returns {Array} - 处理后的数据数组
      */
     processHandoverData(data, pickingType) {
-        console.log('---------------------' + pickingType);
         if (pickingType === '' || pickingType == null) {
             return data.map(item => ({
                 id: item.E0 || 0,
@@ -101,33 +100,13 @@ const HandoverOrderFetcher = {
         params.append('special_platform', '');
         params.append('special_platform_number', '');
 
-        // 打印请求参数日志
-        console.log('=== 交接班数据请求参数 ===');
-        console.log('请求URL:', url);
-        console.log('请求方法:', 'POST');
-        console.log('请求参数:', params.toString());
-        console.log('========================');
-
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'Accept': 'application/json, text/javascript, */*; q=0.01',
-                    'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-                    'Origin': 'https://yzt.wms.yunwms.com',
-                    'Sec-Fetch-Site': 'same-origin',
-                    'Sec-Fetch-Mode': 'cors',
-                    'Sec-Fetch-Dest': 'empty',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"macOS"',
-                    'Accept-Encoding': 'gzip, deflate, br, zstd',
-                    // Cookie 需动态获取（见注释）
-                    // 'Cookie': 'LANGUAGE=zh_CN; PHPSESSID=jveu4tt91gjnpgrb9dgke37e9b; ...'  // 动态获取
-                },
+                    },
                 body: params.toString(),
                 credentials: 'include'  // 保留 cookie 认证
             });
@@ -141,8 +120,6 @@ const HandoverOrderFetcher = {
                 responseData = await response.json();
             } catch (error) {
                 console.error('响应不是有效的JSON格式:', error);
-                const responseText = await response.text();
-                console.log('响应内容:', responseText.substring(0, 200) + '...');
                 throw new Error(`服务器返回的不是JSON格式，可能是登录页面或错误页面`);
             }
 
@@ -177,7 +154,7 @@ const HandoverOrderFetcher = {
      * 根据产品条码查找一票一件多个拣货单中的订单信息（返回最新的一条）
      * @param {string} productBarcode - 产品条码
      * @param {string} warehouseCode - 仓库编码， '2'
-     * @param {string} pickingType - 订单类别，取一票一件多个 '1'
+     * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1
      * @returns {Promise<Object|null>} - 找到的最新订单信息，如果没找到返回null
      */
     async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '2', pickingType = '1') {

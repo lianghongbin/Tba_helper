@@ -45,7 +45,7 @@ TBA FixKing 是一个 Chrome 扩展，用于对易仓系统进行功能增强，
 ├── popup-utils.js             # 弹窗工具函数
 ├── popup-styles.css           # 弹窗样式
 ├── database.js                # 数据库操作
-├── picking-fetcher.js         # 数据抓取模块
+├── fetcher/picking-fetcher.js # 数据抓取模块
 ├── message-handler.js         # 消息处理
 ├── utils.js                   # 通用工具
 ├── db-viewer.html             # 数据库查看器

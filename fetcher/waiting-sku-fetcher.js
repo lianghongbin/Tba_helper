@@ -3,16 +3,17 @@ const WaitingSkuFetcher = {
     /**
      * 根据拣货单号获取SKU详情
      * @param {string} pickingCode - 拣货单号
-     * @returns {Promise<Array>} - SKU详情数组，包含product_barcode、reference_no、waiting_qty
+     * @param {string} productBarcode - 商品 barcode
+     * @returns Promise<{product_id, product_barcode、reference_no、waiting_qty, scan_qty}> - SKU详，包含product_barcode、reference_no、waiting_qty、scan_qty
      */
-    async fetchSkusByPickingCode(pickingCode) {
+    async fetchSkusByPickingCode(pickingCode, productBarcode) {
         if (!pickingCode) {
             throw new Error('拣货单号不能为空');
         }
 
         console.log(`开始获取拣货单 ${pickingCode} 未打印标签的SKU详情...`);
 
-        const url = 'http://yzt.wms.yunwms.com/shipment/orders-pack/get-waiting-sku';
+        const url = 'https://yzt.wms.yunwms.com/shipment/orders-pack/get-waiting-sku';
         const params = new URLSearchParams();
         params.append('pickingCode', pickingCode);
 
@@ -31,22 +32,23 @@ const WaitingSkuFetcher = {
             }
 
             const responseData = await response.json();
-            console.log(`成功获取拣货单 ${pickingCode} 的SKU详情:`, responseData);
-            
             // 检查接口返回状态
             if (responseData.state !== 1) {
                 throw new Error(`接口返回错误: ${responseData.message || '未知错误'}`);
             }
             
             // 提取需要的字段：product_barcode, reference_no, waiting_qty
-            const skuList = (responseData.data || []).map(item => ({
+            const skuList = (responseData.data || [])
+                .filter(item => item.product_barcode = productBarcode)
+                .map(item => ({
+                product_id: item.product_id || '',
                 product_barcode: item.product_barcode || '',
                 reference_no: item.reference_no || '',
-                waiting_qty: item.waiting_qty || '0'
-            }));
+                waiting_qty: item.waiting_qty || '0',
+                scan_qty: item.scan_qty || '0'
+            })).sort((itemA, itemB) => (itemA.product_id - itemB.product_id));
             
-            console.log(`拣货单 ${pickingCode} 的未打印标签SKU列表:`, skuList);
-            return skuList;
+            return skuList[0];
         } catch (error) {
             console.error(`获取拣货单 ${pickingCode} 的SKU详情失败:`, error);
             throw error;

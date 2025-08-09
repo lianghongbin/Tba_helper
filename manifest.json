@@ -36,7 +36,7 @@
                 "database.js",
                 "warehouse-storage.js",
                 "warehouse-manager.js",
-                "handover-order-fetcher.js",
+                "fetcher/handover-order-fetcher.js",
                 "picking-code-selector.js",
                 "picking-code-initializer.js",
                 "public-label.js",
@@ -60,7 +60,7 @@
                 "picking-code-selector.js",
                 "picking-code-initializer.js",
 
-                "picking-fetcher.js",
+                "fetcher/picking-fetcher.js",
                 "message-handler.js",
                 "iframe-injector.js",
                 "popup-styles.css",
