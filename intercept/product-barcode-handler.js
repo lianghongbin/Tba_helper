@@ -18,6 +18,8 @@
 class ProductBarcodeHandler {
     constructor(config = {}) {
         this.debugMode = config.debugMode ?? true;
+        this.publicLabelHandler = window.xAI.PublicLabelManager;
+        this.handoverOrderFetcher = window.xAI.HandoverOrderFetcher;
         this.init();
     }
 
@@ -29,7 +31,7 @@ class ProductBarcodeHandler {
     }
 
     /**
-     * 处理产品代码提交的业务逻辑
+     * 处理产品代码提交的业务逻辑,如果传过来的 pickingCode 为空就自动为其设置 pickingCode
      */
     async handleProductBarcodeSubmit(productBarcode, eventType) {
         try {
@@ -38,8 +40,7 @@ class ProductBarcodeHandler {
             this.log('info', `事件类型: ${eventType}`);
 
             const result = await this.executeBusinessLogic(productBarcode, eventType);
-            this.log('info', '产品代码业务逻辑处理完成');
-            return { success: true, data: result };
+
         } catch (error) {
             this.log('error', '处理产品代码业务逻辑时出错:', error);
             throw error;
@@ -54,27 +55,17 @@ class ProductBarcodeHandler {
         this.log('info', `处理产品代码: ${productBarcode}`);
         this.log('info', `事件类型: ${eventType}`);
 
-
-
-        // 同步显示到 Public Label
-        try {
-            if (window.xAI && window.xAI.PublicLabelManager) {
-                window.xAI.PublicLabelManager.showInfo(productBarcode, { autoHide: false });
-            } else {
-                this.log('warn', 'PublicLabelManager 未加载，无法显示条码提示');
-                alert('系统警告：无法显示条码信息，请联系管理员');
-            }
-        } catch (e) {
-            this.log('error', '显示 Public Label 时发生异常:', e);
+        const result = await this.handoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode, '2', '0');
+        if (result == null) {
+            this.log('info', '没有找到barcode的拣货单')
+            return null;
         }
 
-        this.log('info', '=== 业务逻辑执行完成 ===');
-        return {
-            originalProductBarcode: productBarcode,
-            eventType,
-            timestamp: new Date().toISOString(),
-            processed: true
-        };
+        // 同步显示到 Public Label
+        this.publicLabelHandler.showInfo(result.pickingCode);
+
+        this.log('info', result.pickingCode);
+        return result.pickingCode;
     }
 
     /**

@@ -70,7 +70,7 @@ class SecondSortingHandler {
     /**
      * 处理二次分拣的主要业务逻辑
      * @param {{pickingCode, productBarcode}} data
-     * @return {state,message,data} - 返回数据
+     * @return {{state,message,data}} - 返回数据
      */
     async handleSecondSorting(data) {
         try {

@@ -47,9 +47,9 @@ class ErrorPromptEventInterceptor {
             this.observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList') {
-                        mutation.addedNodes.forEach((node) => {
+                        mutation.addedNodes.forEach(async (node) => {
                             if (node.nodeType === Node.ELEMENT_NODE) {
-                                this.handleAddedNode(node);
+                                await this.handleAddedNode(node);
                             }
                         });
                     }
@@ -58,7 +58,7 @@ class ErrorPromptEventInterceptor {
 
             // 限制观察范围，提升性能
             const container = document.querySelector('body, .container') || document.body;
-            this.observer.observe(container, { childList: true, subtree: false });
+            this.observer.observe(container, {childList: true, subtree: false});
             this.log('info', '弹窗监听器已启动');
         } catch (error) {
             this.log('error', '启动弹窗监听器失败:', error);
@@ -68,7 +68,7 @@ class ErrorPromptEventInterceptor {
     /**
      * 处理新增的DOM节点
      */
-    handleAddedNode(node) {
+    async handleAddedNode(node) {
         // 检查是否是错误弹窗
         if (node instanceof HTMLElement && node.matches(this.dialogSelector)) {
             const errorMessage = node.querySelector(this.errorMessageSelector);
@@ -86,7 +86,7 @@ class ErrorPromptEventInterceptor {
                 this.log('info', '调度器：检测到错误弹窗:', errorText);
 
                 // 调度业务逻辑处理
-                this.scheduleErrorProcessing(errorText);
+                await this.scheduleErrorProcessing(errorText);
             }
         }
     }
@@ -98,10 +98,18 @@ class ErrorPromptEventInterceptor {
         try {
             this.isProcessing = true;
             const productBarcodeInput = document.querySelector('#productBarcode');
-            const productBarcode = productBarcodeInput ? productBarcodeInput.value.trim() : '';
+            const pickingCodeInput = document.querySelector('#pickingCode');
+            const productBarcode = productBarcodeInput.value;
+            const pickingCode = pickingCodeInput.value;
             this.log('info', '调度器：开始处理错误弹窗业务逻辑');
 
-            await this.executeBusinessLogic(errorText, productBarcode);
+            if (!pickingCode || !productBarcode) {
+                return;
+            }
+
+            //调用错误处理的方法
+            await window.xAI.ErrorPromptHandler.handleErrorPrompt(errorText, productBarcode);
+
             this.log('info', '调度器：错误弹窗业务逻辑处理完成');
         } catch (error) {
             this.log('error', '调度器：处理错误弹窗时出错:', error);
@@ -111,18 +119,6 @@ class ErrorPromptEventInterceptor {
         }
     }
 
-    /**
-     * 执行业务逻辑
-     */
-    async executeBusinessLogic(errorText, productBarcode) {
-        this.log('info', '调度器：调用业务处理模块');
-        if (window.xAI && window.xAI.ErrorPromptHandler) {
-            await window.xAI.ErrorPromptHandler.handleErrorPrompt(errorText, productBarcode);
-        } else {
-            this.log('error', '调度器：ErrorPromptHandler 模块未找到');
-            throw new Error('ErrorPromptHandler 未加载');
-        }
-    }
 
     /**
      * 停止监听

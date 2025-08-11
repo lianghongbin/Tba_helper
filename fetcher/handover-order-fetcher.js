@@ -21,26 +21,12 @@ const HandoverOrderFetcher = {
     /**
      * 处理交接班数据
      * @param {Array} data - 原始数据数组
-     * @param {string} pickingType - 订单类别: 空：全部； 01:一票一件和一票一件多个； 0:一票一件; 1：一票一件多个; 2：一票多个
+     * @param {string} pickingType - 订单类别: 空：全部； 0:一票一件; 1：一票一件多个; 2：一票多个
      * @returns {Array} - 处理后的数据数组
      */
     processHandoverData(data, pickingType) {
         if (pickingType === '' || pickingType == null) {
             return data.map(item => ({
-                id: item.E0 || 0,
-                pickingCode: item.picking_code || '',
-                pickingType: item.E16 || '',
-                pickingTypeName: this.getPickingTypeName(item.E16 || ''),
-                orderProduct: (item.order_product || []).map(product => ({
-                    orderId: product.order_id || '',
-                    quantity: product.op_quantity || '',
-                    productBarcode: product.product_barcode || ''
-                }))
-            }));
-        } else if (pickingType ==='01') {
-            return data
-                .filter(item => (item.E16 === '0' || item.E16 === '1'))
-                .map(item => ({
                 id: item.E0 || 0,
                 pickingCode: item.picking_code || '',
                 pickingType: item.E16 || '',
@@ -165,11 +151,11 @@ const HandoverOrderFetcher = {
     },
 
     /**
-     * 根据产品条码查找一票一件多个拣货单中的订单信息（返回最新的一条）
+     * 根据产品条码查找拣货单中的订单信息（返回最新的一条）
      * @param {string} productBarcode - 产品条码
      * @param {string} warehouseCode - 仓库编码， '2'
-     * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1
-     * @returns {Promise<[{id, pickingCode, pickingType, pickingTypeName, orderProduct:[{orderId, quantity, productBarcode}]}]|null>} - 找到的最新订单信息，如果没找到返回null
+     * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1, 一票多个:2
+     * @returns {Promise<{id, pickingCode, pickingType, pickingTypeName, orderProduct:[{orderId, quantity, productBarcode}]}|null>} - 找到的最新订单信息，如果没找到返回null
      *
      */
     async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '2', pickingType = '1') {
@@ -194,8 +180,10 @@ const HandoverOrderFetcher = {
                 return null;
             }
 
-            // 根据id倒序排序，取最上面（最新）的一条
-            allHandoverData.sort((a, b) => b.id - a.id);
+
+            // 根据id倒序排序，取最上面（最新）的一条；
+            //将返回过来的一
+            allHandoverData.filter( item => item.pickingType === pickingType).sort((a, b) => b.id - a.id);
             const latestOrder = allHandoverData[0];
 
             console.log(`找到 ${allHandoverData.length} 条匹配记录，返回最新的:`, latestOrder);

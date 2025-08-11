@@ -51,14 +51,6 @@ class PublicLabelManager {
             // 显示标签
             this.visible();
 
-            // 处理自动隐藏
-            if (options.autoHide !== false) {
-                const duration = options.duration || 5000; // 默认5秒后自动隐藏
-                setTimeout(() => {
-                    this.hide();
-                }, duration);
-            }
-
             return true;
         } catch (error) {
             this.log('error', '显示内容时出错:', error);
