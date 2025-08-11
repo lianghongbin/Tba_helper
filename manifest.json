@@ -44,6 +44,7 @@
                 "intercept/error-prompt-event.js",
                 "intercept/product-barcode-event.js",
                 "intercept/product-barcode-handler.js",
+                "page/second-sorting.js",
                 "content.js"
             ],
             "run_at": "document_idle",
@@ -72,6 +73,7 @@
                 "intercept/error-prompt-event.js",
                 "intercept/product-barcode-event.js",
                 "intercept/product-barcode-handler.js",
+                "page/second-sorting.js",
                 "db-viewer.html",
                 "db-viewer.js"
             ],

@@ -21,11 +21,91 @@ class ErrorPromptHandler {
         this.init();
     }
 
+    /**
+     * 处理二次分拣结果
+     * @param {string} type - 结果类型 (error 或 info)
+     * @param {string} message - 结果消息
+     * @param {Object} data - 相关的数据
+     */
+    handleSecondSortingResult(type, message, data) {
+        try {
+            this.log('info', `收到二次分拣结果: ${type} - ${message}`);
+            
+            if (type === 'error') {
+                // 处理错误情况
+                this.log('error', '二次分拣处理出现错误:', message);
+                
+                // 可以在这里添加错误处理逻辑
+                // 比如显示错误提示、记录日志等
+                if (window.xAI && window.xAI.PublicLabelManager) {
+                    window.xAI.PublicLabelManager.showError(`二次分拣错误: ${message}`);
+                }
+                
+                return {
+                    success: false,
+                    message: message,
+                    type: 'error',
+                    data: data
+                };
+            } else {
+                // 处理正常情况
+                this.log('info', '二次分拣处理正常:', message);
+                
+                // 可以在这里添加成功处理逻辑
+                // 比如显示成功提示、更新状态等
+                if (window.xAI && window.xAI.PublicLabelManager) {
+                    window.xAI.PublicLabelManager.showInfo(`二次分拣信息: ${message}`);
+                }
+                
+                return {
+                    success: true,
+                    message: message,
+                    type: 'info',
+                    data: data
+                };
+            }
+        } catch (error) {
+            this.log('error', '处理二次分拣结果时出错:', error);
+            return {
+                success: false,
+                message: '处理二次分拣结果时出错',
+                type: 'error',
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * 监听二次分拣结果事件
+     */
+    setupSecondSortingResultListener() {
+        if (this.resultEventListener) {
+            document.removeEventListener('secondSortingResult', this.resultEventListener);
+        }
+
+        this.resultEventListener = (event) => {
+            const { type, message, data } = event.detail;
+            this.handleSecondSortingResult(type, message, data);
+        };
+
+        document.addEventListener('secondSortingResult', this.resultEventListener);
+        this.log('info', '二次分拣结果事件监听器已设置');
+    }
+
+    /**
+     * 初始化
+     */
     init() {
+        this.log('info', 'ErrorPromptHandler 初始化开始');
+        
+        // 设置二次分拣结果监听器
+        this.setupSecondSortingResultListener();
+        
         // 将实例挂载到全局命名空间
         window.xAI = window.xAI || {};
         window.xAI.ErrorPromptHandler = this;
-        this.log('info', '错误弹窗业务处理器已初始化');
+        
+        this.log('info', 'ErrorPromptHandler 初始化完成');
     }
 
     /**
@@ -47,16 +127,33 @@ class ErrorPromptHandler {
 
             //自动查找 一票一件多个中是否有该 barcode
             const result = await this.autoSelectPicking(productBarcode);
-            if (result == null) {
-                console.log('info', '没有找到该产品的一票一件多个的订单');
-                return;
-            }
 
-            const oneLabelOneItemMulti = result['oneLabelOneItemMulti'][0];
 
             //接下来调用二次分拣页面的功能，将拣货单和 barcode填入到二次分拣的页面直接打印
+            this.log('info', '准备调用二次分拣功能...');
+            this.log('info', '检查 SecondSortingHandler 是否存在:', !!window.xAI?.SecondSortingHandler);
+            
+            if (window.xAI && window.xAI.SecondSortingHandler) {
+                const secondSortingData = {
+                    productBarcode: 'aa',
+                    pickingCode: 'bb'
+                };
 
+                this.log('info', '=== 开始调用二次分拣处理器 ===');
+                this.log('info', '发送的数据:', secondSortingData);
+                this.log('info', 'SecondSortingHandler 实例:', window.xAI.SecondSortingHandler);
 
+                try {
+                    const result = await window.xAI.SecondSortingHandler.handleSecondSorting(secondSortingData);
+                    this.log('info', '二次分拣处理器返回结果:', result);
+                } catch (error) {
+                    this.log('error', '调用二次分拣处理器时出错:', error);
+                }
+            } else {
+                this.log('error', 'SecondSortingHandler 模块未找到！');
+                this.log('error', 'window.xAI 对象:', window.xAI);
+                this.log('error', '可用的模块:', Object.keys(window.xAI || {}));
+            }
 
             // 如果有产品条码，执行相关业务逻辑
             if (productBarcode) {
@@ -138,10 +235,10 @@ class ErrorPromptHandler {
 
     /**
      * 根据 barcode自动选择拣货单
-     * @param {string} product_barcode - 商品 barcode
+     * @param {string} productBarcode - 商品 barcode
      * @return [{'oneLabelOneItem': oneLabelOneItem}, {'oneLabelOneItemMulti': oneLabelOneItemMulti}];
      */
-    async autoSelectPicking(product_barcode) {
+    async autoSelectPicking(productBarcode) {
         const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '01');
         if (result == null) {
             return null;
@@ -152,6 +249,8 @@ class ErrorPromptHandler {
 
         return [{'oneLabelOneItem': oneLabelOneItem}, {'oneLabelOneItemMulti': oneLabelOneItemMulti}];
     }
+
+
 
     /**
      * 日志输出
