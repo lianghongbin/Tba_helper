@@ -29,21 +29,33 @@ class ProductBarcodeHandler {
     }
 
     /**
-     * 处理产品代码提交的业务逻辑
+     * 拣货单为空，该业务逻辑是自动匹配拣货单
+     * @return Promise<{string}> pickingCode
      */
-    async handleProductBarcodeSubmit(productBarcode, eventType) {
+    async handleProductBarcodeSubmit(productBarcode) {
         try {
-            this.log('info', '开始处理产品代码业务逻辑');
+            this.log('info', '开始处理按 SKU 打包，拣货单为空自动填充处理......');
             this.log('info', `产品代码: ${productBarcode}`);
-            this.log('info', `事件类型: ${eventType}`);
 
-            const result = await this.executeBusinessLogic(productBarcode, eventType);
-            this.log('info', '产品代码业务逻辑处理完成');
-            return { success: true, data: result };
+            return await this.autoPickingCode(productBarcode);
         } catch (error) {
-            this.log('error', '处理产品代码业务逻辑时出错:', error);
+            this.log('error', '按 SKU 打包，拣货单为空自动填充处理错误:', error);
             throw error;
         }
+    }
+
+    /**
+     *
+     * @param productBarcode
+     * @return Promise<{string}>
+     */
+    async autoPickingCode(productBarcode) {
+        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '0');
+        if (result == null) {
+            return null;
+        }
+
+        return result.pickingCode;
     }
 
     /**
@@ -53,8 +65,6 @@ class ProductBarcodeHandler {
         this.log('info', '=== 执行业务逻辑 ===');
         this.log('info', `处理产品代码: ${productBarcode}`);
         this.log('info', `事件类型: ${eventType}`);
-
-
 
         // 同步显示到 Public Label
         try {

@@ -85,10 +85,10 @@ const HandoverOrderFetcher = {
 
         console.log(`开始获取 ${dateFor} 的交接班数据...`);
 
-        const url = 'https://yzt.wms.yunwms.com/shipment/close-report/list/page/1/pageSize/100';
+        const url = 'http://yzt.wms.yunwms.com/shipment/close-report/list/page/1/pageSize/10000';
 
         // 构建请求参数（使用 URLSearchParams，确保 urlencoded 格式）
-        const params = new URLSearchParams();
+        const params = new FormData();
         params.append('E16', orderType);  // 订单状态：空是所有；0、未打包；1、未签出
         params.append('E4', warehouseCode);   // 仓库：1是一号仓，2是二号仓
         if (pickingType !== '') {
@@ -98,7 +98,9 @@ const HandoverOrderFetcher = {
                 params.append('E016', '1')
         }
         params.append('pickingCodeSearchType', '1');    // 拣货单搜索方式：1、精准匹配；2、模糊匹配
-        params.append('picking_code', pickingCode);
+        if (pickingCode!=='') {
+            params.append('picking_code', pickingCode);
+        }
         params.append('searchDateType', 'createDate');
         params.append('dateFor', dateFor);
         params.append('sort_type', 'add_time');
@@ -168,8 +170,8 @@ const HandoverOrderFetcher = {
      * 根据产品条码查找一票一件多个拣货单中的订单信息（返回最新的一条）
      * @param {string} productBarcode - 产品条码
      * @param {string} warehouseCode - 仓库编码， '2'
-     * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1
-     * @returns {Promise<[{id, pickingCode, pickingType, pickingTypeName, orderProduct:[{orderId, quantity, productBarcode}]}]|null>} - 找到的最新订单信息，如果没找到返回null
+     * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1; 如果参数是 01，则取出一票一件和一票一件多个的订单
+     * @returns Promise<{{id:{string}, pickingCode:{string}, pickingType:{string}, pickingTypeName:{string}, orderProduct:[{orderId:{string}, quantity:{string}, productBarcode:{string}}]}}>|null - 找到的最新订单信息，如果没找到返回null
      *
      */
     async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '2', pickingType = '1') {
@@ -198,10 +200,10 @@ const HandoverOrderFetcher = {
             allHandoverData.sort((a, b) => b.id - a.id);
             const latestOrder = allHandoverData[0];
 
-            console.log(`找到 ${allHandoverData.length} 条匹配记录，返回最新的:`, latestOrder);
+            console.log(`找到 ${allHandoverData.length} 条匹配记录，返回最新的: ${latestOrder}`);
             return latestOrder;
         } catch (error) {
-            console.error(`查找产品条码 ${productBarcode} 的订单信息失败:`, error);
+            console.error(`查找产品条码 ${productBarcode} 的订单信息失败:${error}`);
             throw error;
         }
     }

@@ -17,8 +17,10 @@ class ProductBarcodeEventInterceptor {
     constructor(config = {}) {
         this.debugMode = config.debugMode ?? true;
         this.selector = config.selector || '#productBarcode';
+        this.pickingCodeSeletcor = config.pickingCodeSelector || '#pickingCode';
         this.isListening = config.enableListening ?? true; // 监听开关，默认启用
         this.productBarcodeInput = null;
+        this.pickingCodeInput = null;
         this.submitButton = null;
         this._isBound = false;
         this._observer = null;
@@ -31,6 +33,7 @@ class ProductBarcodeEventInterceptor {
     tryInitialize() {
         try {
             this.productBarcodeInput = document.querySelector(this.selector);
+            this.pickingCodeInput = document.querySelector(this.pickingCodeSeletcor)
             if (this.productBarcodeInput) {
                 // 同时获取确认按钮（与输入框在同一块区域）
                 this.submitButton = document.querySelector('.submitProduct');
@@ -78,8 +81,9 @@ class ProductBarcodeEventInterceptor {
         // 监听 keydown 事件，捕获 Enter 键
         this.keydownHandler = (event) => {
             if (event.key === 'Enter') {
+                const pickingCode = this.pickingCodeInput.value.trim();
                 const productBarcode = this.productBarcodeInput.value.trim();
-                this.executeBusinessLogic(productBarcode, 'keydown').catch(() => {});
+                this.executeBusinessLogic(pickingCode, productBarcode, 'keydown').catch(() => {});
             }
         };
         this.productBarcodeInput.addEventListener('keydown', this.keydownHandler);
@@ -88,8 +92,9 @@ class ProductBarcodeEventInterceptor {
         // 监听“确认”按钮点击（同一 DOM 片段中的 .submitProduct）
         if (this.submitButton) {
             this.clickHandler = () => {
+                const pickingCode = this.pickingCodeInput.value.trim();
                 const productBarcode = this.productBarcodeInput.value.trim();
-                this.executeBusinessLogic(productBarcode, 'click').catch(() => {});
+                this.executeBusinessLogic(pickingCode, productBarcode, 'click').catch(() => {});
             };
             this.submitButton.addEventListener('click', this.clickHandler);
             this.log('info', '已绑定 .submitProduct 点击监听');
@@ -129,13 +134,27 @@ class ProductBarcodeEventInterceptor {
     }
 
     /**
+     * @param {string} pickingCode
+     * @param {string} productBarcode
+     * @param eventType
      * 执行业务逻辑
      */
-    async executeBusinessLogic(productBarcode, eventType) {
+    async executeBusinessLogic(pickingCode, productBarcode, eventType) {
         this.log('info', '调度器：开始执行业务逻辑');
+        if (pickingCode !== null && pickingCode !== '') {
+            this.log('info', '拣货单号: ' + pickingCode);
+        }
+
         if (window.xAI && window.xAI.ProductBarcodeHandler) {
-            await window.xAI.ProductBarcodeHandler.handleProductBarcodeSubmit(productBarcode, eventType);
-            this.log('info', '调度器：业务逻辑执行完成');
+            console.log('info', '拣货单号为空，走自动匹配拣货单逻辑.');
+            const pickingCode = await window.xAI.ProductBarcodeHandler.handleProductBarcodeSubmit(productBarcode);
+            if (pickingCode !== null && pickingCode !== '') {
+                this.pickingCodeInput.value = pickingCode;
+                this.log('info', '设置拣货单号为：' + pickingCode);
+            }
+            else {
+                this.log('info', '没有找到' + productBarcode +"对应的一票一件订单.");
+            }
         } else {
             this.log('error', '调度器：ProductBarcodeHandler 模块未找到');
             alert('系统错误：无法处理产品代码，请联系管理员');
