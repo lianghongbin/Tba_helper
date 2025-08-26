@@ -179,7 +179,11 @@ class ErrorPromptHandler {
      * @return Promise<{{id:{string},orderProduct:[{}],pickingCode:{string},pickingType:{string},pickingTypeName:{string}}>;
      */
     async selectOrderByBarcode(productBarcode) {
-        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode, '2', '1');
+        let warehouseCode;
+        if (window.xAI && window.xAI.WarehouseManager) {
+            warehouseCode = window.xAI.WarehouseManager.getWarehouseId();
+        }
+        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode, warehouseCode, '1');
         if (result == null) {
             return null;
         }

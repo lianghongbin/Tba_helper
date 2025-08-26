@@ -34,6 +34,7 @@
             "js": [
                 "utils.js",
                 "database.js",
+                "page/second-sorting.js",
                 "warehouse-storage.js",
                 "warehouse-manager.js",
                 "fetcher/handover-order-fetcher.js",
@@ -44,7 +45,6 @@
                 "intercept/error-prompt-event.js",
                 "intercept/product-barcode-event.js",
                 "intercept/product-barcode-handler.js",
-                "page/second-sorting.js",
                 "content.js"
             ],
             "run_at": "document_idle",

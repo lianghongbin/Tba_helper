@@ -7,7 +7,8 @@
 let isInitialized = false;
 let observer = null;
 let lastInitMenuLog = 0;
-let dailyFetchChecked = false; // 跟踪当天是否已检查过fetchPickings
+let dailyFetchChecked = false;
+let lastObserverTrigger = 0;
 
 /**
  * 安全的工具函数获取
@@ -117,6 +118,18 @@ function initializeInputHandlers() {
             }, 1000);
         }
 
+        // 仅在输入框有有效值时触发 SecondSortingHandler
+        try {
+            const pickingCode = pickingInput.value?.trim();
+            const productBarcode = input.value?.trim();
+            if (pickingCode && productBarcode && isGlobalObjectAvailable('SecondSortingHandler', true)) {
+                console.log('检测到有效输入数据，触发 SecondSortingHandler');
+                window.xAI.SecondSortingHandler.handleSecondSorting({ pickingCode, productBarcode });
+            }
+        } catch (error) {
+            console.error('触发 SecondSortingHandler 失败:', error);
+        }
+
         return true;
     }
     return false;
@@ -127,17 +140,15 @@ function initializeInputHandlers() {
  * @returns {boolean} 是否找到出货管理菜单
  */
 function initializeShipmentMenuHandler() {
-    // 简单去抖：6秒内不重复打日志
     if (Date.now() - lastInitMenuLog < 6000) return false;
     lastInitMenuLog = Date.now();
 
-    console.log('开始执行 initializeShipmentMenuHandler......');
+    console.log('开始执行 initializeShipmentMenuHandler...');
     const menuItems = document.querySelectorAll('li a');
     const menuElement = Array.from(menuItems).find(a => a.textContent.trim() === '出货管理');
     if (menuElement) {
         console.log('检测到"出货管理"菜单');
 
-        // 只在启动时检查一次，不重复检查
         const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
         const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
 
@@ -174,6 +185,9 @@ function setupObservers() {
     }
 
     observer = new MutationObserver(() => {
+        if (Date.now() - lastObserverTrigger < 1000) return;
+        lastObserverTrigger = Date.now();
+
         console.log('DOM 变化检测');
         const inputsReady = initializeInputHandlers();
 
@@ -195,7 +209,12 @@ function setupObservers() {
         }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['value']
+    });
     console.log('观察器已启动');
 }
 
@@ -205,6 +224,14 @@ function setupObservers() {
 function handleRouteChange() {
     console.log('检测到路由变化');
     isInitialized = false;
+
+    // 检查 SecondSortingHandler 初始化状态
+    const initState = localStorage.getItem('SecondSortingHandler_Init');
+    if (initState) {
+        console.log('检测到 SecondSortingHandler 初始化记录，跳过重新初始化');
+        return;
+    }
+
     setupObservers();
     initializeInputHandlers();
     initializeShipmentMenuHandler();
@@ -395,7 +422,6 @@ function init() {
 
     console.log('扩展初始化');
 
-    // 检查是否需要重置每日检查状态
     const today = safeGetFunction('getCurrentDate', () => new Date().toISOString().split('T')[0])();
     const lastCheckDate = localStorage.getItem('tba_last_fetch_check_date');
     if (lastCheckDate !== today) {
@@ -419,7 +445,7 @@ function init() {
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     safeInit();
 } else {
-    document.addEventListener('DOMContentLoaded', safeInit);
+    document.addEventListener('DOMContentLoaded', safeInit, { once: true });
 }
 
 // 全局测试函数，可在控制台中直接调用
@@ -429,8 +455,9 @@ window.testTBAHelper = {
         const dependencies = {
             Utils: typeof Utils !== 'undefined',
             PickingCodeInitializer: isGlobalObjectAvailable('PickingCodeInitializer'),
-            ErrorPromptEventInterceptor: isGlobalObjectAvailable('ErrorPromptEventInterceptor', true), // 使用 xAI 命名空间
+            ErrorPromptEventInterceptor: isGlobalObjectAvailable('ErrorPromptEventInterceptor', true),
             PublicLabelManager: isGlobalObjectAvailable('PublicLabelManager', true),
+            SecondSortingHandler: isGlobalObjectAvailable('SecondSortingHandler', true),
             jQuery: isJQueryAvailable(),
             ChromeAPI: typeof chrome !== 'undefined' && chrome.runtime
         };

@@ -37,9 +37,9 @@ class ProductBarcodeHandler {
             this.log('info', '开始处理按 SKU 打包，拣货单为空自动填充处理......');
             this.log('info', `产品代码: ${productBarcode}`);
 
-            return await this.autoPickingCode(productBarcode);
+            return  await this.selectOrderByProductBarcode(productBarcode);
         } catch (error) {
-            this.log('error', '按 SKU 打包，拣货单为空自动填充处理错误:', error);
+            this.log('error', '根据 barcode查找一票一件订单出错:', error);
             throw error;
         }
     }
@@ -49,42 +49,17 @@ class ProductBarcodeHandler {
      * @param productBarcode
      * @return Promise<{string}>
      */
-    async autoPickingCode(productBarcode) {
-        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode,'2', '0');
+    async selectOrderByProductBarcode(productBarcode) {
+        let warehouseCode;
+        if (window.xAI && window.xAI.WarehouseManager) {
+            warehouseCode = window.xAI.WarehouseManager.getWarehouseId();
+        }
+        const result = await window.xAI.HandoverOrderFetcher.findLatestOrderByProductBarcode(productBarcode, warehouseCode, '0');
         if (result == null) {
             return null;
         }
 
         return result.pickingCode;
-    }
-
-    /**
-     * 执行业务逻辑
-     */
-    async executeBusinessLogic(productBarcode, eventType) {
-        this.log('info', '=== 执行业务逻辑 ===');
-        this.log('info', `处理产品代码: ${productBarcode}`);
-        this.log('info', `事件类型: ${eventType}`);
-
-        // 同步显示到 Public Label
-        try {
-            if (window.xAI && window.xAI.PublicLabelManager) {
-                window.xAI.PublicLabelManager.showInfo(productBarcode, { autoHide: false });
-            } else {
-                this.log('warn', 'PublicLabelManager 未加载，无法显示条码提示');
-                alert('系统警告：无法显示条码信息，请联系管理员');
-            }
-        } catch (e) {
-            this.log('error', '显示 Public Label 时发生异常:', e);
-        }
-
-        this.log('info', '=== 业务逻辑执行完成 ===');
-        return {
-            originalProductBarcode: productBarcode,
-            eventType,
-            timestamp: new Date().toISOString(),
-            processed: true
-        };
     }
 
     /**

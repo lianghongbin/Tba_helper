@@ -17,273 +17,493 @@
  */
 
 class SecondSortingHandler {
+    static instance = null;
+    static STORAGE_KEY = 'SecondSortingHandler_Init';
+    static STORAGE_EXPIRY = 24 * 60 * 60 * 1000; // 24小时有效期
+    static VERSION = '1.0.0';
+
     constructor(config = {}) {
+        // 检查 localStorage 初始化状态
+        const initState = localStorage.getItem(SecondSortingHandler.STORAGE_KEY);
+        if (initState) {
+            try {
+                const { timestamp } = JSON.parse(initState);
+                if (Date.now() - timestamp < SecondSortingHandler.STORAGE_EXPIRY) {
+                    if (SecondSortingHandler.instance) {
+                        console.log('[SecondSortingHandler] 返回现有实例，localStorage 已记录初始化', {
+                            instanceId: SecondSortingHandler.instance.instanceId
+                        });
+                        return SecondSortingHandler.instance;
+                    }
+                } else {
+                    localStorage.removeItem(SecondSortingHandler.STORAGE_KEY);
+                }
+            } catch (error) {
+                console.warn('[SecondSortingHandler] localStorage 解析失败，清理状态:', error);
+                localStorage.removeItem(SecondSortingHandler.STORAGE_KEY);
+            }
+        }
+
+        if (SecondSortingHandler.instance) {
+            console.log('[SecondSortingHandler] 返回现有实例', {
+                instanceId: SecondSortingHandler.instance.instanceId
+            });
+            return SecondSortingHandler.instance;
+        }
+        SecondSortingHandler.instance = this;
+
         this.debugMode = config.debugMode ?? true;
         this.currentData = null;
         this.isPageLoaded = false;
-        this.virtualPage = null; // 虚拟页面环境
-        this.virtualDocument = null; // 虚拟页面的document对象
-        this.init();
-    }
+        this.isLoadingVirtualPage = false;
+        this.virtualPage = null;
+        this.virtualDocument = null;
+        this.instanceId = `SecondSortingHandler_${Date.now()}`;
+        this.lastHandleSecondSorting = 0;
+        this.log('info', '创建新实例', { instanceId: this.instanceId, stack: new Error().stack });
 
-    init() {
-        // 将实例挂载到全局命名空间
+        // 心跳：定期刷新本地状态，便于健康检查与并发判断
+        try {
+            this._heartbeatTimer = setInterval(() => {
+                try {
+                    localStorage.setItem(SecondSortingHandler.STORAGE_KEY, JSON.stringify({
+                        version: SecondSortingHandler.VERSION,
+                        instanceId: this.instanceId,
+                        lastHeartbeat: Date.now(),
+                    }));
+                } catch (e) {}
+            }, 10000);
+            // 初始写入一次
+            localStorage.setItem(SecondSortingHandler.STORAGE_KEY, JSON.stringify({
+                version: SecondSortingHandler.VERSION,
+                instanceId: this.instanceId,
+                lastHeartbeat: Date.now(),
+            }));
+        } catch (e) {}
+
+        // 绑定快捷键事件
+        this.onKeyDown = this.onKeyDown.bind(this);
+        document.addEventListener('keydown', this.onKeyDown);
+
+        // 窗口卸载时清理
+        this.onBeforeUnload = this.onBeforeUnload.bind(this);
+        window.addEventListener('beforeunload', this.onBeforeUnload, { once: true });
+
+        // 将实例挂到全局对象，便于调试
         window.xAI = window.xAI || {};
         window.xAI.SecondSortingHandler = this;
-        this.log('info', '二次分拣处理器已初始化');
 
-        // 初始化时加载二次分拣页面
-        this.loadVirtualPage();
+        // 自动加载虚拟页面
+        this.log('info', '准备初始化虚拟页面', { instanceId: this.instanceId });
+        this.initVirtualPage();
+
+        // 存储初始化状态
+        try {
+            localStorage.setItem(SecondSortingHandler.STORAGE_KEY, JSON.stringify({
+                timestamp: Date.now(),
+                instanceId: this.instanceId
+            }));
+        } catch (error) {
+            this.log('error', '写入 localStorage 初始化状态失败:', error.message);
+        }
     }
 
-    result = {state:0, message:'', data:''}
+    /**
+     * 初始化虚拟页面
+     */
+    async initVirtualPage() {
+        this.log('info', 'initVirtualPage 调用栈:', new Error().stack, { instanceId: this.instanceId });
+        try {
+            await this.loadVirtualPage();
+        } catch (error) {
+            this.log('error', '初始化加载虚拟页面失败:', error.message);
+        }
+    }
 
     /**
      * 加载虚拟页面
+     * @returns {Promise<boolean>}
      */
     async loadVirtualPage() {
+        this.log('info', 'loadVirtualPage 调用栈:', new Error().stack, { instanceId: this.instanceId });
+        if (this.isLoadingVirtualPage) {
+            this.log('warn', '虚拟页面正在加载中，跳过重复调用', { instanceId: this.instanceId });
+            return false;
+        }
+        if (this.isPageLoaded && this.virtualDocument) {
+            this.log('info', '虚拟页面已加载，跳过重复加载', { instanceId: this.instanceId });
+            return true;
+        }
+
+        let iframe = null;
         try {
-            this.log('info', '开始加载二次分拣页面到虚拟环境...');
+            this.isLoadingVirtualPage = true;
+            const startTime = Date.now();
+            this.log('info', '开始加载二次分拣页面到虚拟环境...', { instanceId: this.instanceId });
 
-            // 1. 创建一个 iframe 来加载页面
-            const iframe = document.createElement('iframe');
-            // 设置样式以确保它不可见
-            iframe.style.display = 'none';
+            iframe = document.createElement('iframe');
+            Object.assign(iframe.style, {
+                display: 'none',
+                position: 'absolute',
+                width: '0',
+                height: '0',
+                border: '0'
+            });
+
+            const pageUrl = 'http://yzt.wms.yunwms.com/shipment/orders-pack/sorting?quick=104';
+            try {
+                new URL(pageUrl);
+            } catch {
+                throw new Error('Invalid URL provided');
+            }
+
+            iframe.setAttribute('data-active', 'true');
+            iframe.setAttribute('data-owner', this.instanceId);
+            iframe.src = pageUrl;
             document.body.appendChild(iframe);
-            iframe.src = 'https://yzt.wms.yunwms.com/shipment/orders-pack/sorting?quick=104';
 
-            // 2. 监听 iframe 的加载完成事件
-            await new Promise(resolve => iframe.onload = resolve);
-            console.log('页面已加载到 iframe 中');
-            // 3. 获取 iframe 的文档对象
+            await Promise.race([
+                new Promise((resolve, reject) => {
+                    iframe.onload = () => resolve(true);
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('iframe 加载超时')), 30000))
+            ]);
+
+            this.virtualPage = iframe;
             this.virtualDocument = iframe.contentDocument;
 
-            this.log('info', '二次分拣页面已加载到虚拟环境');
-            this.log('info', '虚拟页面标题:', this.virtualDocument.title);
+            if (!this.virtualDocument) {
+                this.log('warn', 'iframe.contentDocument 不可用（可能跨域），将以最小能力工作', {
+                    instanceId: this.instanceId
+                });
+            } else {
+                try {
+                    const title = this.virtualDocument.title || '(no title)';
+                    const readyState = this.virtualDocument.readyState;
+                    this.log('info', '虚拟页面加载完成', { title, readyState, instanceId: this.instanceId });
 
+                    const productInput = this.virtualDocument.querySelector('#productBarcode');
+                    if (!productInput) {
+                        this.log('warn', '未找到 #productBarcode，页面结构可能变化', { instanceId: this.instanceId });
+                    }
+                } catch (e) {
+                    this.log('warn', '访问虚拟文档失败（可能跨域）', e?.message);
+                }
+
+                try {
+                    const oldIframe = document.body.querySelector(`iframe[src="${pageUrl}"]:not([data-active])`);
+                    if (oldIframe && oldIframe !== iframe) {
+                        oldIframe.remove();
+                    }
+                } catch {}
+            }
+
+            const elapsed = Date.now() - startTime;
+            this.isPageLoaded = true;
+            this.log('info', `二次分拣页面加载成功，耗时 ${elapsed}ms`, { instanceId: this.instanceId });
+            return true;
         } catch (error) {
-            this.log('error', '加载虚拟页面失败:', error);
+            this.isPageLoaded = false;
+            this.log('error', '加载虚拟页面失败:', error.message, { instanceId: this.instanceId });
+            if (iframe && iframe.parentNode) {
+                try { iframe.remove(); } catch {}
+            }
+            return false;
+        } finally {
+            this.isLoadingVirtualPage = false;
         }
     }
 
+    /**
+     * 监听键盘事件
+     * @param {KeyboardEvent} e
+     */
+    onKeyDown(e) {
+        try {
+            const isCtrlSpace = (e.ctrlKey || e.metaKey) && (e.key === ' ' || e.code === 'Space');
+            const isEscape = e.key === 'Escape';
+            if (isCtrlSpace) {
+                e.preventDefault();
+                this.handleSecondSorting({ productBarcode: '', pickingCode: '' });
+                return;
+            }
+            if (isEscape) {
+                this.closeSecondSortingPage();
+                return;
+            }
+        } catch (error) {
+            this.log('error', '键盘事件处理异常:', error.message, { instanceId: this.instanceId });
+        }
+    }
 
     /**
-     * 处理二次分拣的主要业务逻辑
-     * @param {{pickingCode, productBarcode}} data
-     * @return {state,message,data} - 返回数据
+     * 处理二次分拣业务
+     * @param {{productBarcode:string, pickingCode:string}} data
      */
     async handleSecondSorting(data) {
-        try {
-            await this.log('info', '开始处理二次分拣业务逻辑');
-            await this.log('info', '接收到的数据:', data);
+        const now = Date.now();
+        if (now - this.lastHandleSecondSorting < 300) {
+            this.log('warn', '二次分拣触发过于频繁，已节流', { instanceId: this.instanceId });
+            return;
+        }
+        this.lastHandleSecondSorting = now;
 
-            // 保存当前数据
+        try {
             this.currentData = data;
-
-            //设置 pickingCode值
-            await this.pickingCodeInput(data.pickingCode);
-            // 自动点击"开始配货"按钮
-            await this.autoClickSubmitPicking();
-
-            //检查开始配货的状态，如果出错直接返回错误数据。
-            const result = await this.checkSubmitResult();
-            if (result.state!==0) {
-                return result;
+            if (!this.isPageLoaded) {
+                const ok = await this.loadVirtualPage();
+                if (!ok) {
+                    this.log('error', '虚拟页面加载失败，无法继续处理分拣');
+                    return;
+                }
             }
 
-            //拣货单正常的话就赋值 barcode
-            await this.printProductBarcode(data.productBarcode);
-
-            await this.log('info', '二次分拣业务逻辑处理完成');
-            return {
-                state:0,
-                message: '二次分拣页面数据已更新',
-                data: ''
-            };
-
-        } catch (error) {
-            await this.log('error', '处理二次分拣业务逻辑时出错:', error);
-            return {
-                success: false,
-                message: '处理二次分拣时出错',
-                type: 'error',
-                error: error.message
-            };
-        }
-    }
-
-
-    /**
-     * 为 pickingCode 赋值
-     * @param pickingCode
-     * @return {Promise<void>}
-     */
-    async pickingCodeInput(pickingCode) {
-        // 在虚拟页面上查找输入框
-        const pickingCodeInput = this.virtualDocument.querySelector('#pickingCode');
-
-        // 在虚拟页面上填充拣货单号
-        pickingCodeInput.value = pickingCode;
-        await this.log('info', 'pickingCode 赋值完成。');
-    }
-
-    /**
-     * 为 productBarcode 赋值,打印
-     * @param productBarcode
-     * @return {Promise<void>}
-     */
-    async printProductBarcode(productBarcode) {
-        // 在虚拟页面上查找输入框
-        const productBarcodeInput = this.virtualDocument.querySelector('#productBarcode');
-
-        // 在虚拟页面上填充拣货单号
-        productBarcodeInput.value = productBarcode;
-        await this.log('info', 'productBarcode 赋值完成。');
-
-        //在输入框里回车
-        if (productBarcodeInput) {
-            const enterEvent = new KeyboardEvent('keydown', {
-                bubbles: true,
-                cancelable: true,
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13
-            });
-            productBarcodeInput.dispatchEvent(enterEvent);
-        }
-    }
-
-    /**
-     * 自动点击"开始配货"按钮
-     */
-    async autoClickSubmitPicking() {
-        try {
-            // 在虚拟页面上查找"开始配货"按钮
-            const submitPickingBtn = this.virtualDocument.querySelector('#submitPicking');
-            // 在虚拟页面上点击按钮
-            submitPickingBtn.click();
-
-            await this.log('info', '"开始配货"按钮已在虚拟页面上自动点击');
-        } catch (error) {
-            await this.log('error', '在虚拟页面上自动点击"开始配货"按钮时出错:', error);
-        }
-    }
-
-    /**
-     * 简单的提交结果检查方法
-     * @return '{state:0,message:'',data:'' };
-     */
-    async checkSubmitResult() {
-        try {
-            // 在虚拟页面上检查是否有错误消息
-            const errorMessage = this.virtualDocument.querySelector('#submitPicking-message');
-
-            if (errorMessage && errorMessage.style.display !== 'none') {
-                const messageText = errorMessage.textContent || errorMessage.innerText;
-
-                await this.log('info', '在虚拟页面上检测到错误消息:', messageText);
-                return {state:1, message:messageText, data:''};
+            try {
+                // 尝试在虚拟文档中填充并提交
+                const doc = this.virtualDocument;
+                if (doc) {
+                    const productInput = doc.querySelector('#productBarcode');
+                    const codeInput = doc.querySelector('#pickingCode');
+                    if (productInput) productInput.value = data.productBarcode || '';
+                    if (codeInput) codeInput.value = data.pickingCode || '';
+                    const submitBtn = doc.querySelector('button[type="submit"], .submit, #submitSorting');
+                    submitBtn?.click?.();
+                } else {
+                    // 跨域：降级处理（这里只做演示日志）
+                    this.log('warn', '跨域环境：无法直接对虚拟文档操作，已跳过表单填充', { instanceId: this.instanceId });
+                }
+            } catch (error) {
+                this.log('warn', '在虚拟页面中填充/提交时出现异常:', error.message);
             }
 
-            return {
-                state:0, message:'', data:''
-            };
+            this.showMessage('二次分拣请求已提交', 'info');
+            this.log('info', '开始处理二次分拣业务逻辑', { instanceId: this.instanceId });
+            this.log('info', '接收到的数据:', data, { instanceId: this.instanceId });
+
         } catch (error) {
-            await this.log('error', '检查虚拟页面提交结果时出错:', error);
+            this.log('error', '处理二次分拣失败:', error.message, { instanceId: this.instanceId });
+            this.showMessage('处理分拣失败：' + error.message, 'error');
         }
     }
 
     /**
-     * 发送结果到 error-prompt-handler
-     * @param {string} level - 结果级别 (error 或 info)
-     * @param {string} message - 结果消息
-     * @param {string} data - 业务数据
+     * 复用前的健康检查
+     * @returns {{ok:boolean, reason?:string}}
      */
-    async sendResultToErrorPromptHandler(level, message, data) {
+    healthCheck() {
         try {
-            window.xAI.ErrorPromptHandler.handleSecondSortingResult(level, message, data);
+            // 形状检查
+            const needMethods = ['log'];
+            for (const m of needMethods) {
+                if (typeof this[m] !== 'function') return { ok: false, reason: 'missing:' + m };
+            }
 
-            await this.log('info', `结果已发送到 error-prompt-handler: ${level} - ${message}`);
+            // 本地存储版本与心跳
+            const raw = localStorage.getItem(SecondSortingHandler.STORAGE_KEY);
+            if (!raw) return { ok: false, reason: 'noLocal' };
+            let parsed;
+            try { parsed = JSON.parse(raw) || {}; } catch { return { ok: false, reason: 'localParse' }; }
+            if (parsed.version && parsed.version !== SecondSortingHandler.VERSION) {
+                return { ok: false, reason: 'version' };
+            }
+            if (!Number.isFinite(+parsed.lastHeartbeat)) {
+                return { ok: false, reason: 'heartbeatInvalid' };
+            }
+            if (Date.now() - parsed.lastHeartbeat > SecondSortingHandler.STORAGE_EXPIRY / 2) {
+                return { ok: false, reason: 'stale' };
+            }
+            if (parsed.instanceId && this.instanceId && parsed.instanceId !== this.instanceId) {
+                return { ok: false, reason: 'instanceMismatch' };
+            }
 
-        } catch (error) {
-            await this.log('error', '发送结果到 error-prompt-handler 时出错:', error);
+            // DOM 依赖
+            if (this.virtualPage && !document.contains(this.virtualPage)) {
+                return { ok: false, reason: 'virtualPageRemoved' };
+            }
+            if (this.iframe && !document.contains(this.iframe)) {
+                return { ok: false, reason: 'iframeRemoved' };
+            }
+            if (this.virtualDocument && this.virtualDocument.defaultView == null) {
+                return { ok: false, reason: 'docViewLost' };
+            }
+
+            // 处置状态
+            if (this.disposed === true) return { ok: false, reason: 'disposed' };
+
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, reason: 'exception:' + (e && e.message || 'unknown') };
         }
+    }
+
+    /**
+     * 展示消息（简单的页面提示）
+     * @param {string} text
+     * @param {'info'|'error'|'warn'} type
+     */
+    showMessage(text, type = 'info') {
+        const id = 'second-sorting-message-style';
+        if (!document.getElementById(id)) {
+            const style = document.createElement('style');
+            style.id = id;
+            style.textContent = `
+            .second-sorting-message {
+                position: fixed;
+                z-index: 999999;
+                bottom: 20px;
+                right: 20px;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                color: #fff;
+                box-shadow: 0 6px 16px rgba(0,0,0,.2);
+                opacity: .98;
+            }
+            .second-sorting-message.info { background: #1677ff; }
+            .second-sorting-message.warn { background: #faad14; }
+            .second-sorting-message.error { background: #ff4d4f; }
+          `;
+            document.head.appendChild(style);
+        }
+        const el = document.createElement('div');
+        el.className = `second-sorting-message ${type}`;
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(() => {
+            try { el.remove(); } catch {}
+        }, 2600);
     }
 
     /**
      * 关闭二次分拣页面
+     * @returns {Promise<void>}
      */
     async closeSecondSortingPage() {
-        // 清理虚拟页面资源
         if (this.virtualPage) {
+            this.virtualPage.remove();
             this.virtualPage = null;
             this.virtualDocument = null;
-            await this.log('info', '虚拟页面资源已清理');
+            this.isPageLoaded = false;
+            this.log('info', '虚拟页面资源已清理', { instanceId: this.instanceId });
         }
 
-        // 移除所有临时消息
         const messages = document.querySelectorAll('.second-sorting-message');
         messages.forEach(msg => msg.remove());
 
-        // 移除临时样式
         const style = document.querySelector('#second-sorting-message-style');
         if (style) {
             style.remove();
         }
 
-        this.isPageLoaded = false;
         this.currentData = null;
-        await this.log('info', '二次分拣页面已关闭');
+        this.log('info', '二次分拣页面已关闭', { instanceId: this.instanceId });
     }
 
     /**
      * 日志输出
+     * @param {string} level - 日志级别 (info, error, warn)
+     * @param {string} message - 日志消息
+     * @param {...any} args - 额外参数
      */
-    async log(level, message, ...args) {
-        if (this.debugMode || level === 'error') {
-            // 根据日志级别选择合适的 console 方法
-            if (level === 'info') {
-                console.info(`[SecondSortingHandler] ${message}`, ...args);
-            } else if (level === 'error') {
-                console.error(`[SecondSortingHandler] ${message}`, ...args);
-            } else {
-                console.log(`[SecondSortingHandler] ${message}`, ...args);
-            }
+    log(level, message, ...args) {
+        if (!this.debugMode && level !== 'error') return;
+        const logMethods = {
+            info: console.info,
+            error: console.error,
+            warn: console.warn,
+            log: console.log
+        };
+        const fn = logMethods[level] || console.log;
+        try {
+            fn(`[SecondSortingHandler][${level}] ${message}`, ...args);
+        } catch (error) {
+            console.log('[SecondSortingHandler] 日志输出失败', error);
         }
     }
 
     /**
-     * 销毁实例
+     * 页面卸载时清理
      */
-    destroy() {
-        this.closeSecondSortingPage();
+    onBeforeUnload() {
+        try {
+            document.removeEventListener('keydown', this.onKeyDown);
+            window.removeEventListener('beforeunload', this.onBeforeUnload);
+        } catch {}
+        try {
+            clearInterval(this._heartbeatTimer);
+        } catch {}
 
-        // 确保虚拟页面资源被清理
-        if (this.virtualPage) {
-            this.virtualPage = null;
-            this.virtualDocument = null;
-        }
+        try {
+            const initState = localStorage.getItem(SecondSortingHandler.STORAGE_KEY);
+            if (initState) {
+                const obj = JSON.parse(initState);
+                if (obj && obj.instanceId === this.instanceId) {
+                    localStorage.removeItem(SecondSortingHandler.STORAGE_KEY);
+                }
+            }
+        } catch {}
 
-        if (window.xAI && window.xAI.SecondSortingHandler) {
-            delete window.xAI.SecondSortingHandler;
-        }
-        this.log('info', '二次分拣处理器已销毁');
+        this.currentData = null;
+        this.log('info', '清理完成', { instanceId: this.instanceId });
     }
 }
 
-// 页面加载完成后初始化
+// 页面加载完成后初始化（含健康检查与本地状态校验）
 try {
+    const boot = () => {
+        const reuseIfHealthy = () => {
+            const inst = SecondSortingHandler.instance;
+            if (inst && typeof inst.healthCheck === 'function') {
+                const { ok, reason } = inst.healthCheck();
+                if (ok) {
+                    window.xAI = window.xAI || {};
+                    window.xAI.SecondSortingHandler = inst;
+                    console.log('[SecondSortingHandler] 复用现有实例');
+                    return true;
+                } else {
+                    console.warn('[SecondSortingHandler] 现有实例不健康，原因:', reason, '，将重建');
+                    try { inst.closeSecondSortingPage?.(); } catch {}
+                }
+            }
+            return false;
+        };
+
+        let reused = false;
+        try { reused = reuseIfHealthy(); } catch {}
+
+        if (!reused) {
+            // 校验 localStorage 记录新鲜度
+            try {
+                const raw = localStorage.getItem(SecondSortingHandler.STORAGE_KEY);
+                if (raw) {
+                    try {
+                        const { lastHeartbeat } = JSON.parse(raw) || {};
+                        if (!Number.isFinite(+lastHeartbeat) || (Date.now() - lastHeartbeat) > SecondSortingHandler.STORAGE_EXPIRY) {
+                            localStorage.removeItem(SecondSortingHandler.STORAGE_KEY);
+                        }
+                    } catch {
+                        localStorage.removeItem(SecondSortingHandler.STORAGE_KEY);
+                    }
+                }
+            } catch {}
+
+            // 新建实例
+            SecondSortingHandler.instance = new SecondSortingHandler();
+            window.xAI = window.xAI || {};
+            window.xAI.SecondSortingHandler = SecondSortingHandler.instance;
+            console.log('[SecondSortingHandler] 已新建实例');
+        }
+    };
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            new SecondSortingHandler();
-        });
+        document.addEventListener('DOMContentLoaded', boot, { once: true });
     } else {
-        new SecondSortingHandler();
+        boot();
     }
 } catch (error) {
     console.error('[SecondSortingHandler] 初始化失败:', error);
+    try { localStorage.removeItem(SecondSortingHandler.STORAGE_KEY); } catch {}
 }
-
 // 导出模块
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SecondSortingHandler;

@@ -50,9 +50,9 @@ class ProductBarcodeEventInterceptor {
                 this._observer = new MutationObserver(() => {
                     const el = document.querySelector(this.selector);
                     if (el) {
-                    this.productBarcodeInput = el;
-                    this.submitButton = document.querySelector('.submitProduct');
-                    if (!this._isBound) {
+                        this.productBarcodeInput = el;
+                        this.submitButton = document.querySelector('.submitProduct');
+                        if (!this._isBound) {
                             this.bindEvents();
                             this._isBound = true;
                         }
@@ -63,7 +63,7 @@ class ProductBarcodeEventInterceptor {
                 });
                 // 限制观察范围，提升性能
                 const container = document.querySelector('form, .container') || document.body;
-                this._observer.observe(container, { childList: true, subtree: true });
+                this._observer.observe(container, {childList: true, subtree: true});
             } else {
                 this.log('error', 'MutationObserver 不支持，监听可能失败');
             }
@@ -83,7 +83,8 @@ class ProductBarcodeEventInterceptor {
             if (event.key === 'Enter') {
                 const pickingCode = this.pickingCodeInput.value.trim();
                 const productBarcode = this.productBarcodeInput.value.trim();
-                this.executeBusinessLogic(pickingCode, productBarcode, 'keydown').catch(() => {});
+                this.executeBusinessLogic(pickingCode, productBarcode, 'keydown').catch(() => {
+                });
             }
         };
         this.productBarcodeInput.addEventListener('keydown', this.keydownHandler);
@@ -94,7 +95,8 @@ class ProductBarcodeEventInterceptor {
             this.clickHandler = () => {
                 const pickingCode = this.pickingCodeInput.value.trim();
                 const productBarcode = this.productBarcodeInput.value.trim();
-                this.executeBusinessLogic(pickingCode, productBarcode, 'click').catch(() => {});
+                this.executeBusinessLogic(pickingCode, productBarcode, 'click').catch(() => {
+                });
             };
             this.submitButton.addEventListener('click', this.clickHandler);
             this.log('info', '已绑定 .submitProduct 点击监听');
@@ -143,21 +145,16 @@ class ProductBarcodeEventInterceptor {
         this.log('info', '调度器：开始执行业务逻辑');
         if (pickingCode !== null && pickingCode !== '') {
             this.log('info', '拣货单号: ' + pickingCode);
+            return;
         }
 
-        if (window.xAI && window.xAI.ProductBarcodeHandler) {
-            console.log('info', '拣货单号为空，走自动匹配拣货单逻辑.');
-            const pickingCode = await window.xAI.ProductBarcodeHandler.handleProductBarcodeSubmit(productBarcode);
-            if (pickingCode !== null && pickingCode !== '') {
-                this.pickingCodeInput.value = pickingCode;
-                this.log('info', '设置拣货单号为：' + pickingCode);
-            }
-            else {
-                this.log('info', '没有找到' + productBarcode +"对应的一票一件订单.");
-            }
+        console.log('info', '拣货单号为空，走自动匹配拣货单逻辑.');
+        const result = await window.xAI.ProductBarcodeHandler.handleProductBarcodeSubmit(productBarcode);
+        if (result !== null) {
+            this.pickingCodeInput.value = result;
+            this.log('info', '设置拣货单号为：' + result);
         } else {
-            this.log('error', '调度器：ProductBarcodeHandler 模块未找到');
-            alert('系统错误：无法处理产品代码，请联系管理员');
+            this.log('info', '没有找到' + productBarcode + "对应的一票一件订单,自动拣货单结束.");
         }
     }
 

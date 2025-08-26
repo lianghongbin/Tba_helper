@@ -116,14 +116,13 @@ const HandoverOrderFetcher = {
         params.append('special_platform', '');
         params.append('special_platform_number', '');
 
+        console.info(params);
+
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'Accept': 'application/json, text/javascript, */*; q=0.01',
-                    },
-                body: params.toString(),
+                body: params,
                 credentials: 'include'  // 保留 cookie 认证
             });
 
