@@ -116,9 +116,6 @@ const HandoverOrderFetcher = {
         params.append('special_platform', '');
         params.append('special_platform_number', '');
 
-        console.info(params);
-
-
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -140,7 +137,7 @@ const HandoverOrderFetcher = {
 
             // 检查接口返回状态
             if (responseData.state !== 1) {
-                console.log(`接口返回状态: ${responseData.state}, 消息: ${responseData.message || '无数据'}`);
+                console.log(`接口返回状态: ${responseData.state},  ${responseData.message || '无数据'}`);
                 return [];
             }
 
