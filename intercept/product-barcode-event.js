@@ -151,11 +151,36 @@ class ProductBarcodeEventInterceptor {
         console.log('info', '拣货单号为空，走自动匹配拣货单逻辑.');
         const result = await window.xAI.ProductBarcodeHandler.handleProductBarcodeSubmit(productBarcode);
         if (result !== null) {
-            this.pickingCodeInput.value = result;
+            //this.pickingCodeInput.value = result;
+            this.setInputValue(this.productBarcodeInput, result);
             this.log('info', '设置拣货单号为：' + result);
         } else {
             this.log('info', '没有找到' + productBarcode + "对应的一票一件订单,自动拣货单结束.");
         }
+    }
+
+    /**
+     * 设置值
+     * @param el
+     * @param value
+     * @return {boolean}
+     */
+    setInputValue(el, value) {
+        if (!el) return false;
+        // 1) 用元素原型上的原生 setter 设置值（避开框架在元素实例上打的 getter/setter）
+        const proto = el instanceof HTMLTextAreaElement
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+
+        const valueSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        valueSetter ? valueSetter.call(el, value) : (el.value = value);
+
+        // 2) 触发“用户输入”语义的事件（必须 bubbles: true）
+        el.dispatchEvent(new Event('input', { bubbles: true }));   // React/Vue 监听这个
+        // （可选）一些表单库还监听 change
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+
+        return true;
     }
 
     /**

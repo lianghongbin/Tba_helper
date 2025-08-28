@@ -257,6 +257,7 @@
                 });
 
                 this._attachButtonMonitors();
+                this._attachProductBarcodeMonitor();
 
                 // 触发就绪：通知外部 & 兑现早期 ready promise
                 try {
@@ -304,9 +305,7 @@
                 submitBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
                         const tgt = e.currentTarget;
-                        this.log('info', '按钮按下回车：#submitPicking', {
-                            id: tgt?.id, name: tgt?.name, text: (tgt?.textContent || '').trim()
-                        });
+                        this.log('info', '按钮按下回车：#submitPicking');
                     }
                 }, {capture: true});
             }
@@ -319,13 +318,33 @@
                     el.type === 'button' || el.type === 'submit'
                 );
                 if (!isButton) return;
-                this.log('debug', '按钮点击（全局捕获）', {
-                    id: el.id, name: el.name, type: el.type, text: (el.textContent || '').trim()
-                });
+                this.log('info', '按钮点击（全局捕获）');
             }, true);
 
             this._buttonsMonitored = true;
             this.log('info', '按钮按下事件监控已绑定');
+        }
+
+        /**
+         * 绑定输入框监控（监听回车）—— 仅绑定一次
+         * @private
+         */
+        _attachProductBarcodeMonitor() {
+            if (this._barcodeMonitored) return;
+            const inputEl = this.virtualDocument.querySelector('#productBarcode');
+            if (inputEl) {
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
+                        const tgt = e.currentTarget;
+                        this.log('info', '条码输入框回车：#productBarcode:' + inputEl.value);
+                        // 在这里写你需要触发的业务逻辑，比如提交、校验等
+                        // this._handleBarcodeEnter(tgt.value);
+                    }
+                }, { capture: true });
+            }
+
+            this._barcodeMonitored = true;
+            this.log('info', '条码输入框回车事件监控已绑定');
         }
 
         /**
@@ -394,25 +413,25 @@
          * @return {Promise<void>}
          */
         async printProductBarcode(productBarcode) {
-            const doc = this.virtualDocument;
-            if (!doc) {
-                this.log('warn', '虚拟文档不可用，无法设置 productBarcode');
-                return;
-            }
-            const input = doc.querySelector('#productBarcode');
+            const input = this.virtualDocument.querySelector('#productBarcode');
+            const inputHidden = this.virtualDocument.querySelector('#productBarcodeHidden');
+
             if (!input) {
                 this.log('warn', '未找到 #productBarcode 输入框');
                 return;
             }
 
+            this.log('info', 'pickingCode的值' + this.virtualDocument.querySelector("#pickingCode").value);
+
             input.value = productBarcode;
+            inputHidden.value = productBarcode;
             this.log('info', 'productBarcode 赋值完成');
 
             const enterEvent = new KeyboardEvent('keydown', {
                 bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
             });
             input.dispatchEvent(enterEvent);
-            this.log('debug', '已在 #productBarcode 触发 Enter');
+            this.log('info', '已在 #productBarcode 触发 Enter');
         }
 
         /**
@@ -421,12 +440,7 @@
          */
         async autoClickSubmitPicking() {
             try {
-                const doc = this.virtualDocument;
-                if (!doc) {
-                    this.log('warn', '虚拟文档不可用，无法点击“开始配货”');
-                    return;
-                }
-                const btn = doc.querySelector('#submitPicking');
+                const btn = this.virtualDocument.querySelector('#submitPicking');
                 if (!btn) {
                     this.log('warn', '未找到 #submitPicking 按钮');
                     return;
@@ -444,18 +458,13 @@
          */
         async checkSubmitResult() {
             try {
-                const doc = this.virtualDocument;
-                if (!doc) {
-                    this.log('warn', '虚拟文档不可用，无法检查提交结果');
-                    return {state: 1, message: '虚拟文档不可用', data: ''};
-                }
-
-                const errorMessage = doc.querySelector('#submitPicking-message');
-                if (errorMessage && errorMessage.style.display !== 'none') {
-                    const messageText = errorMessage.textContent || errorMessage.innerText || '';
+                const errorMessage = this.virtualDocument.querySelector('#submitPicking-message');
+                const messageText = errorMessage.textContent || errorMessage.innerText || '';
+                if (messageText !== '') {
                     this.log('info', '在虚拟页面上检测到错误消息', {messageText});
                     return {state: 1, message: messageText, data: messageText};
                 }
+
                 return {state: 0, message: '', data: ''};
             } catch (error) {
                 this.log('error', '检查虚拟页面提交结果时出错:', {err: error?.message});

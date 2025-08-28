@@ -129,7 +129,7 @@ class ErrorPromptHandler {
             const result = await this.selectOrderByBarcode(productBarcode);
             if (result === null) {
                 console.log('info', '根据 barcode 没有查找到一票一件多个订单信息，自动化处理到此结束.');
-                //return;
+                return;
             }
 
             this.log("info", '根据 barcode查找到的一票一件多个订单信息' + result)
@@ -142,7 +142,7 @@ class ErrorPromptHandler {
             if (window.xAI && window.xAI.SecondSortingHandler) {
                 const secondSortingData = {
                     productBarcode: productBarcode,
-                    pickingCode: 'aa'
+                    pickingCode: result.pickingCode
                 };
 
                 this.log('info', '=== 开始调用二次分拣处理器 ===');
