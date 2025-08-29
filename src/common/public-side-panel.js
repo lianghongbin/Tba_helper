@@ -63,6 +63,10 @@
       white-space: pre-wrap;                 /* 代码也可折行 */
       word-wrap: break-word;
     }
+    
+    .xai-variant--error .xai-float__body {
+        color: #dc2626;
+    }
 
     .xai-variant--info  { border-left: 3px solid #2563eb; }
     .xai-variant--error { border-left: 3px solid #dc2626; }
@@ -127,17 +131,19 @@
     }
 
     function enableDrag(box, handle) {
-        let dragging = false, startX=0, startY=0, startLeft=0, startTop=0;
+        let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
         const onDown = (e) => {
             dragging = true;
             const evt = ('touches' in e) ? e.touches[0] : e;
-            startX = evt.clientX; startY = evt.clientY;
+            startX = evt.clientX;
+            startY = evt.clientY;
             const rect = box.getBoundingClientRect();
-            startLeft = rect.left; startTop = rect.top;
+            startLeft = rect.left;
+            startTop = rect.top;
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
-            document.addEventListener('touchmove', onMove, {passive:false});
+            document.addEventListener('touchmove', onMove, {passive: false});
             document.addEventListener('touchend', onUp);
             e.preventDefault();
         };
@@ -148,9 +154,9 @@
             const dx = evt.clientX - startX;
             const dy = evt.clientY - startY;
             const left = Math.max(8, Math.min(window.innerWidth - box.offsetWidth - 8, startLeft + dx));
-            const top  = Math.max(8, Math.min(window.innerHeight - box.offsetHeight - 8, startTop + dy));
+            const top = Math.max(8, Math.min(window.innerHeight - box.offsetHeight - 8, startTop + dy));
             box.style.left = left + 'px';
-            box.style.top  = top + 'px';
+            box.style.top = top + 'px';
             box.style.right = 'auto';
             box.style.bottom = 'auto';
             box.style.position = 'fixed';
@@ -166,15 +172,15 @@
         };
 
         handle.addEventListener('mousedown', onDown);
-        handle.addEventListener('touchstart', onDown, {passive:false});
+        handle.addEventListener('touchstart', onDown, {passive: false});
     }
 
     function setVariant(v) {
         const el = ensurePanel();
-        el.classList.remove('xai-variant--info','xai-variant--error');
+        el.classList.remove('xai-variant--info', 'xai-variant--error');
         el.classList.add(v === 'error' ? 'xai-variant--error' : 'xai-variant--info');
         const title = el.querySelector('.xai-float__title');
-        if (title) title.textContent = v === 'error' ? '错误' : '插件信息';
+        if (title) title.textContent = v === 'error' ? '插件信息' : '插件信息';
     }
 
     function setContent(content) {
@@ -187,10 +193,22 @@
         el.hidden = false;
     }
 
-    function show(content, variant='info'){ setVariant(variant); setContent(content); }
-    function showInfo(html){ show(html, 'info'); }
-    function showError(html){ show(html, 'error'); }
-    function hide(){ ensurePanel().hidden = true; }
+    function show(content, variant = 'info') {
+        setVariant(variant);
+        setContent(content);
+    }
+
+    function showInfo(html) {
+        show(html, 'info');
+    }
+
+    function showError(html) {
+        show(html, 'error');
+    }
+
+    function hide() {
+        ensurePanel().hidden = true;
+    }
 
     /* ===== 内部私有：渲染“订单产品信息”表格，一行数据 ===== */
     function renderProductTableRow(data) {
@@ -219,15 +237,25 @@
     }
 
     // 暴露 API
-    NS.PublicSidePanelManager = { showInfo, showError, setContent, hide, showProductRow };
+    NS.PublicSidePanelManager = {showInfo, showError, setContent, hide, showProductRow};
 
     // ===== 自启动：默认就创建并显示面板 =====
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            try { ensurePanel(); console.info('[SidePanel] auto-mounted'); } catch (e) { console.error(e); }
-        }, { once: true });
+            try {
+                ensurePanel();
+                console.info('[SidePanel] auto-mounted');
+            } catch (e) {
+                console.error(e);
+            }
+        }, {once: true});
     } else {
-        try { ensurePanel(); console.info('[SidePanel] auto-mounted'); } catch (e) { console.error(e); }
+        try {
+            ensurePanel();
+            console.info('[SidePanel] auto-mounted');
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     setContent('<div style="color:#6b7280;">插件面板已加载</div>');

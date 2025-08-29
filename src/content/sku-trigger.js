@@ -21,6 +21,24 @@ const CONFIG = {
     routeTimeoutMs: 1000 * 60 * 2
 };
 
+/* =========================
+ * [ADD] 仅新增：拦截弹窗的工具函数
+ * 说明：只在“指定错误文案”时调用，以便用户完全看不到该弹窗
+ * ========================= */
+function suppressDialog(dialogEl) {
+    try {
+        const dlg = dialogEl?.closest?.(CONFIG.dialogSelector) || dialogEl;
+        if (dlg && dlg.style) dlg.style.display = 'none'; // 先隐藏，防止闪屏
+        // 常见遮罩类名，按需补充
+        document.querySelectorAll('.ui-widget-overlay, .ui-dialog-mask, .modal-backdrop')
+            .forEach(ov => ov.remove());
+        dlg?.remove?.();
+        console.info('[A] 已拦截并移除指定错误弹窗');
+    } catch (e) {
+        console.warn('[A] 拦截弹窗失败：', e);
+    }
+}
+
 /** 单次路由到 B（如果 B 不存在/已关闭/无响应，立即判定未就绪） */
 function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
     const corrId = makeCorrId();
@@ -76,27 +94,7 @@ class ErrorPromptEventInterceptor {
         this.lastProcessedDialog = null;
         this.lastProcessedTime = 0;
 
-        this.installResultListener();
         this.start();
-    }
-
-    installResultListener() {
-        if (this._installed) return;
-        this._installed = true;
-
-        document.addEventListener('secondSortingResult', (event) => {
-            const detail = event?.detail || {};
-            if (detail.type === 'error') {
-                console.info('[A] event:error', detail.message);
-                window.xAI.PublicLabelManager.showError(detail.message || '二次分拣失败');
-            } else {
-                console.info('[A] event:info', detail.message);
-                window.xAI.PublicLabelManager.showSuccess(detail.message || '二次分拣成功');
-            }
-        });
-
-        log.info('二次分拣结果事件监听器已设置（A侧回显）。');
-        window.xAI.PublicLabelManager.showInfo('已建立与二次分拣结果的联动');
     }
 
     start() {
@@ -127,40 +125,53 @@ class ErrorPromptEventInterceptor {
         const errorText = (errEl.textContent || '').trim();
         if (!errorText) return;
 
+        /* =========================
+         * [ADD] 仅在“特定错误文案”时拦截并继续处理；
+         *       其它任何错误弹窗：不拦截、也不进入 handle（直接 return）
+         * ========================= */
+        const input = document.querySelector(this.cfg.productBarcodeSelector);
+        const barcode = input ? (input.value || '').trim() : '';
+        const isTarget =
+            barcode &&
+            errorText.startsWith(`产品代码:${barcode}`) &&
+            errorText.endsWith('未找到匹配未完成的订单');
+
+        if (!isTarget) {
+            // 非目标错误：不处理，保持页面原有行为（弹窗怎么显示继续怎么显示）
+            return;
+        }
+
+        // 命中目标错误：先把弹窗干掉，避免用户看到；然后继续走原有流程
+        suppressDialog(dialog); // [ADD]
+
         const now = Date.now();
         if (this.isProcessing) return;
         if (this.lastProcessedDialog === dialog && (now - this.lastProcessedTime) < this.cfg.dedupeWindowMs) return;
 
         this.lastProcessedDialog = dialog;
         this.lastProcessedTime = now;
-        this.handle(errorText);
+        this.handle(barcode);
     }
 
-    async handle(errorText) {
+    async handle(barcode) {
         try {
             console.info('开始处理错误弹窗逻辑......');
             this.isProcessing = true;
-            const input = document.querySelector(this.cfg.productBarcodeSelector);
-            const barcode = input ? (input.value || '').trim() : '';
-            console.info('barcode:' + barcode);
-            if (barcode === '') {
+
+            //如果二次分拣页面没有打开
+            if (!await isBRegistered()) {
+                window.xAI.PublicSidePanelManager.showError('二次分拣页面没有打开.');
                 return;
             }
-            if (!(errorText.startsWith(`产品代码:${barcode}`) && errorText.endsWith('未找到匹配未完成的订单'))) {
-                return;
-            }
-
-            console.info('是要处理的错误，继续向下');
-
-            console.info('[A] 当前条码：', barcode);
 
             const latest = await api.findLatestOrderByProductBarcode(barcode, '1', '1');
             if (!latest?.pickingCode) {
                 window.xAI.PublicLabelManager.showSuccess(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
+                window.xAI.PublicSidePanelManager.showError(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
                 return;
             }
 
-            window.xAI.PublicLabelManager.showInfo(`条码：${barcode}， 有一票一件多个订单,正在打印.......`);
+            //window.xAI.PublicLabelManager.showInfo(`条码：${barcode}， 有一票一件多个订单,正在打印.......`);
 
             // 发消息到 B（这里仍用你旧的字段名示范；你也可以改回真实业务字段）
             const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
@@ -173,9 +184,30 @@ class ErrorPromptEventInterceptor {
             const msg = String(e?.message || e);
             window.xAI.PublicLabelManager.showError(msg);
         } finally {
+            const input = document.querySelector(this.cfg.productBarcodeSelector);
+            if (input) {
+                input.focus();   // 获得焦点
+                input.select();  // 全选内容
+            }
             this.isProcessing = false;
         }
     }
+}
+
+async function isBRegistered() {
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+            { type: 'CHECK_B_REGISTERED' },
+            (resp) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('检查 B 注册状态失败:', chrome.runtime.lastError.message);
+                    resolve(false);
+                } else {
+                    resolve(resp?.registered === true);
+                }
+            }
+        );
+    });
 }
 
 try {

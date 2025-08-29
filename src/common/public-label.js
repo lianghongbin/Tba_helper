@@ -28,7 +28,6 @@ class PublicLabelManager {
         // 同步挂载到统一命名空间，避免调用方找不到
         window.xAI = window.xAI || {};
         window.xAI.PublicLabelManager = this;
-        this.log('info', '公共标签管理器已初始化');
     }
 
     /**
@@ -40,7 +39,6 @@ class PublicLabelManager {
      */
     show(text, type = 'info', options = {}) {
         try {
-            this.log('info', `显示内容: ${text} (${type})`);
 
             // 确保标签存在
             this.ensureLabelExists();
@@ -125,7 +123,6 @@ class PublicLabelManager {
             const container = document.getElementById(this.containerId);
             if (container) {
                 container.style.display = 'block';
-                this.log('info', '标签已显示');
             }
             return true;
         } catch (error) {
@@ -163,10 +160,8 @@ class PublicLabelManager {
                         label.style.color = 'inherit';
                 }
                 
-                this.log('info', `标签内容已更新: ${text} (${type})`);
                 return true;
             } else {
-                this.log('error', '标签元素未找到');
                 return false;
             }
         } catch (error) {
@@ -193,7 +188,6 @@ class PublicLabelManager {
             // 创建标签
             this.createLabel();
         } else {
-            this.log('info', '提示行容器不存在，等待创建...');
             setTimeout(() => {
                 this.ensureLabelExists();
             }, 500);
@@ -211,14 +205,12 @@ class PublicLabelManager {
         // 查找pickingInfo的父容器，用于创建并行容器
         const pickingInfoContainer = document.getElementById('pickingInfo');
         if (!pickingInfoContainer) {
-            this.log('error', '未找到pickingInfo容器');
             return;
         }
         
         // 获取pickingInfo的父容器
         const parentContainer = pickingInfoContainer.parentElement;
         if (!parentContainer) {
-            this.log('error', '未找到父容器');
             return;
         }
 
@@ -246,8 +238,6 @@ class PublicLabelManager {
         
         // 将容器插入到pickingInfo之前，作为并行容器
         parentContainer.insertBefore(publicLabelContainer, pickingInfoContainer);
-        
-        this.log('info', '公共标签创建成功');
     }
 
     /**

@@ -26,6 +26,14 @@ function removeKey(key) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+
+    if (msg?.type === 'CHECK_B_REGISTERED') {
+        const allB = Array.from(registry[ROLES.B] || []);
+        const isRegistered = allB.length > 0;
+        sendResponse?.({ ok: true, registered: isRegistered });
+        return;
+    }
+
     // —— 注册 —— //
     if (msg?.type === MSG.ROLE_READY) {
         const role = msg.role;
