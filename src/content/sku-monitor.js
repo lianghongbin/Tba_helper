@@ -82,8 +82,8 @@ async function ensureExtraButton(confirmBtn) {
 /** [NEW] 额外按钮的点击处理（你可以在这里写任意业务逻辑） */
 async function handleExtraButtonClick() {
     // 示例：读取当前条码并展示
-    const input = document.querySelector('#productBarcode');
-    const barcode = input ? (input.value || '').trim() : '';
+    const inputEl = document.querySelector('#productBarcode');
+    const barcode = inputEl ? (inputEl.value || '').trim() : '';
     if (barcode === '') {
         return;
     }
@@ -97,6 +97,8 @@ async function handleExtraButtonClick() {
     }
 
     pickingCodeEl.value = latest?.pickingCode;
+    inputEl.focus();
+    inputEl.select();
 }
 
 /** 轮询查找元素并绑定（简洁稳定） */
