@@ -61,9 +61,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 return;
             }
 
-            //开始输出 barcode并确认打印
+            //开始输入 barcode并确认打印
             await printProductBarcode(productBarcode);
-            sendResponse({ok: true, data: {...result, pickingCode}});
+
+            //这里要显示下面 SKU 的订单信息，要获取信息
+            sendResponse({ok: true, message:'', data: ''});
         } catch (e) {
             log.error('处理失败:', e?.message || e);
             sendResponse({ok: false, reason: e?.message || String(e)});

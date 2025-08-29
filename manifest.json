@@ -18,6 +18,14 @@
       "all_frames": true,
       "js": ["src/content/injector.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "http://yzt.wms.yunwms.com/*"
+      ],
+      "all_frames": true,
+      "js": ["src/content/sku-monitor.js"],
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [

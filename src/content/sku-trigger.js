@@ -5,11 +5,11 @@
  * UI 提示仍可用 PublicLabelManager，但所有关键路径都用 console.info 打印，避免静默。
  */
 
-import { Logger } from '../common/logger.js';
-import { MSG, ROLES, makeCorrId } from '../common/protocol.js';
-import { ApiClient } from '../common/api-client.js';
+import {Logger} from '../common/logger.js';
+import {MSG, ROLES, makeCorrId} from '../common/protocol.js';
+import {ApiClient} from '../common/api-client.js';
 
-const log = new Logger({ scope: 'sku-trigger' });
+const log = new Logger({scope: 'sku-trigger'});
 const api = new ApiClient();
 
 /** 配置 */
@@ -19,13 +19,13 @@ const CONFIG = {
     productBarcodeSelector: '#productBarcode',
     dedupeWindowMs: 1000,
     // 原来是 10000ms，过长会让你误以为“没任何提示”
-    routeTimeoutMs: 1000*60*2
+    routeTimeoutMs: 1000 * 60 * 2
 };
 
 /** 单次路由到 B（如果 B 不存在/已关闭/无响应，立即判定未就绪） */
 function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
     const corrId = makeCorrId();
-    console.info('[A] routeToBNoWait -> send', { corrId, data });
+    console.info('[A] routeToBNoWait -> send', {corrId, data});
 
     return new Promise((resolve, reject) => {
         let done = false;
@@ -44,16 +44,18 @@ function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
                 targetRole: ROLES.B,
                 corrId,
                 // 保持你旧版协议（发 BARCODE_REQUEST）
-                payload: { type: MSG.BARCODE_REQUEST, data }
+                payload: {type: MSG.BARCODE_REQUEST, data}
             },
             (resp) => {
                 if (done) return;
                 clearTimeout(timer);
                 const lastErr = chrome.runtime.lastError?.message;
-                console.info('[A] cb', { lastError: lastErr, resp });
+                console.info('[A] cb', {lastError: lastErr, resp});
 
                 // 通道错误或后台未回
-                if (lastErr || resp == null) return fail(lastErr || 'empty resp');
+                if (lastErr || resp == null) {
+                    return fail(lastErr || 'empty resp');
+                }
 
                 // 后台显式告知“没有目标 frame”
                 if (resp.ok !== true) {
@@ -61,14 +63,13 @@ function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
                     if (resp.reason === 'no-target-frames' || resp.reason === 'no-response') {
                         return fail(resp.reason);
                     }
+
                     // 其它业务失败，原样抛给上层
-                    console.info('[A] B 业务失败 =>', resp.reason);
-                    return reject(new Error(resp.reason || 'B 处理失败'));
+                    return reject(new Error(resp.reason || '二次分拣页面处理失败！'));
                 }
 
-                console.info('[A] ok, data <- B', resp.data);
                 done = true;
-                resolve(resp.data);
+                resolve({message:resp.message, data:resp.data});
             }
         );
     });
@@ -77,7 +78,7 @@ function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
 /** 主拦截器：沿用你旧版的弹窗监听流程，仅增强可见性日志 */
 class ErrorPromptEventInterceptor {
     constructor(config = {}) {
-        this.cfg = { ...CONFIG, ...config };
+        this.cfg = {...CONFIG, ...config};
         this.observer = null;
         this.isProcessing = false;
         this.lastProcessedDialog = null;
@@ -95,12 +96,15 @@ class ErrorPromptEventInterceptor {
             const detail = event?.detail || {};
             if (detail.type === 'error') {
                 console.info('[A] event:error', detail.message);
+                window.xAI.PublicLabelManager.showError(detail.message || '二次分拣失败');
             } else {
                 console.info('[A] event:info', detail.message);
+                window.xAI.PublicLabelManager.showSuccess(detail.message || '二次分拣成功');
             }
         });
 
         log.info('二次分拣结果事件监听器已设置（A侧回显）。');
+        window.xAI.PublicLabelManager.showInfo('已建立与二次分拣结果的联动');
     }
 
     start() {
@@ -116,8 +120,9 @@ class ErrorPromptEventInterceptor {
                 }
             }
         });
-        this.observer.observe(container, { childList: true, subtree: true });
+        this.observer.observe(container, {childList: true, subtree: true});
         log.info('弹窗监听器已启动');
+        window.xAI.PublicLabelManager.showInfo('已启动 SKU 错误弹窗监听');
     }
 
     onNodeAdded(node) {
@@ -142,30 +147,35 @@ class ErrorPromptEventInterceptor {
     async handle(errorText) {
         try {
             this.isProcessing = true;
-
-            // 同时打控制台，避免 PublicLabel 未注入导致看不到
-            console.info('[A] 捕获错误弹窗：', errorText);
-
             const input = document.querySelector(this.cfg.productBarcodeSelector);
             const barcode = input ? (input.value || '').trim() : '';
+            if (barcode === '') {
+                return;
+            }
+            if (!(errorText.startsWith(`产品代码${barcode}`) && errorText.endsWith('未找到匹配未完成的订单'))) {
+                return;
+            }
+
             console.info('[A] 当前条码：', barcode);
 
-            // 你的业务：查最新拣货单（如保留，这里不改）
-            // const latest = await api.findLatestOrderByProductBarcode(barcode, '1', '1');
-            // if (!latest?.pickingCode) {
-            //   console.info('[A] 没有一票一件多个订单：', barcode);
-            //   return;
-            // }
+            const latest = await api.findLatestOrderByProductBarcode(barcode, '1', '1');
+            if (!latest?.pickingCode) {
+                window.xAI.PublicLabelManager.showSuccess(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
+                return;
+            }
+
+            window.xAI.PublicLabelManager.showInfo(`条码：${barcode}， 有一票一件多个订单,正在打印.......`);
 
             // 发消息到 B（这里仍用你旧的字段名示范；你也可以改回真实业务字段）
-            const data = await routeToBNoWait({ productBarcode: barcode, pickingCode:'bb' });
+            const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
 
-            console.info('[A] 二次分拣处理完成');
-
+            //显示二次分拣页面的业务处理数据
+            window.xAI.PublicLabelManager.showSuccess(`${message} : ${data}`);
         } catch (e) {
-            const msg = String(e?.message || e);
-            console.info('[A] 处理失败：', msg);
 
+            //显示二次分拣页面处理这边发过去的数据有问题
+            const msg = String(e?.message || e);
+            window.xAI.PublicLabelManager.showError(msg);
         } finally {
             this.isProcessing = false;
         }
@@ -180,4 +190,5 @@ try {
     }
 } catch (e) {
     log.error('sku-trigger 初始化失败：', e);
+    window.xAI.PublicLabelManager.showError(`sku-trigger 初始化失败：${e?.message || e}`);
 }
