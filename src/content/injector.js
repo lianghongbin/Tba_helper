@@ -23,6 +23,7 @@
     const protoURL = chrome.runtime.getURL('src/common/protocol.js');
     const loggerURL = chrome.runtime.getURL('src/common/logger.js');
     const publicLabelURL = chrome.runtime.getURL('src/common/public-label.js');
+    const publicSidePanel = chrome.runtime.getURL('src/common/public-side-panel.js');
 
     Promise.all([import(protoURL), import(loggerURL)])
         .then(async ([proto, commonLogger]) => {
@@ -41,6 +42,7 @@
                     if (role === ROLES.A) {
                         // A 需要先加载 PublicLabel
                         await import(publicLabelURL);
+                        await import(publicSidePanel);
                         const url = chrome.runtime.getURL('src/content/sku-trigger.js');
                         await import(url);
                         log.info('sku-trigger module loaded');

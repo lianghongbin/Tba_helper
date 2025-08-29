@@ -65,7 +65,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             await printProductBarcode(productBarcode);
 
             //这里要显示下面 SKU 的订单信息，要获取信息
-            sendResponse({ok: true, message:'', data: ''});
+            const info = await parseOrderProductList();
+            sendResponse({ok: true, message: '扫描成功', data: info});
         } catch (e) {
             log.error('处理失败:', e?.message || e);
             sendResponse({ok: false, reason: e?.message || String(e)});
@@ -179,30 +180,49 @@ async function checkSubmitResult() {
 }
 
 /**
- * 输入商品条码并触发回车。
+ * 输入商品条码并模拟按下回车，以尽可能触发页面已有监听。
  * @param {string} productBarcode - 商品条码。
  * @returns {Promise<void>}
- * @throws {Error} 如果条码输入或回车触发失败。
+ * @throws {Error} 如果找不到输入框或设置值失败。
  */
 async function printProductBarcode(productBarcode) {
-    try {
-        const input = document.querySelector(SELECTORS.PRODUCT_BARCODE);
+    // 1) 拿到输入框
+    const input = document.querySelector(SELECTORS.PRODUCT_BARCODE);
 
-        // 输入条码并触发回车
-        setInputValue(SELECTORS.PRODUCT_BARCODE_HIDDEN, productBarcode);
-        setInputValue(SELECTORS.PRODUCT_BARCODE, productBarcode);
+    // 2) 设置值（你已有 setInputValue，如果它会抛错就让它抛）
+    setInputValue(SELECTORS.PRODUCT_BARCODE, String(productBarcode ?? '').trim());
 
-        input.dispatchEvent(new KeyboardEvent('keydown', {
-            bubbles: true,
-            cancelable: true,
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13
-        }));
+    // 3) 让框拿到焦点，并通知框架“值变了”
+    input.focus();
+    input.dispatchEvent(new Event('input', {bubbles: true}));   // React/Vue 常用
+    input.dispatchEvent(new Event('change', {bubbles: true}));  // 有些逻辑用 change
 
-        log.info('商品条码输入并触发回车');
-    } catch (e) {
-        log.error('处理商品条码失败', {error: e?.message || e});
-        throw e;
-    }
+    // 4) 尽量完整地发一套键盘事件序列
+    const opts = {bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13};
+    input.dispatchEvent(new KeyboardEvent('keydown', opts));
+    input.dispatchEvent(new KeyboardEvent('keypress', opts));
+    input.dispatchEvent(new KeyboardEvent('keyup', opts));
+
+    log.info('商品条码输入并模拟回车');
+}
+
+/**
+ * 获取打印订单产品表格的第一行数据
+ * @returns {string|null} JSON 字符串，找不到则返回 null
+ */
+function parseOrderProductList() {
+    const row = document.querySelector('#order-product-list-data tr');
+    if (!row) return null;
+
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 5) return null;
+
+    const data = {
+        index: cells[0].textContent.trim(),        // 编号
+        productCode: cells[1].textContent.trim(),  // 产品编码
+        quantity: cells[3].textContent.trim(),     // 产品数量
+        scanQuantity: cells[4].textContent.trim()  // 扫码数量
+    };
+
+    return JSON.stringify(data);
 }

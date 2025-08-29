@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         registry[role].add(key);
         frameMeta.set(key, { tabId, frameId, url, lastSeen: Date.now() });
 
-        log.info('[ROLE_READY]', role, key, url, { sizes: { A: registry.A.size, B: registry.B.size } });
+        log.info('[ROLE_READY]', role, key);
         sendResponse?.({ ok: true });
         return;
     }

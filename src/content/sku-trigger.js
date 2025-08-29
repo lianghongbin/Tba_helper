@@ -17,8 +17,7 @@ const CONFIG = {
     dialogSelector: '.ui-dialog',
     errorMessageSelector: '.tip-error-message',
     productBarcodeSelector: '#productBarcode',
-    dedupeWindowMs: 1000,
-    // 原来是 10000ms，过长会让你误以为“没任何提示”
+    dedupeWindowMs: 1000, // 原来是 10000ms，过长会让你误以为“没任何提示”
     routeTimeoutMs: 1000 * 60 * 2
 };
 
@@ -38,40 +37,33 @@ function routeToBNoWait(data, timeout = CONFIG.routeTimeoutMs) {
 
         const timer = setTimeout(() => fail('timeout'), timeout);
 
-        chrome.runtime.sendMessage(
-            {
-                type: MSG.ROUTE_TO_ROLE,
-                targetRole: ROLES.B,
-                corrId,
-                // 保持你旧版协议（发 BARCODE_REQUEST）
-                payload: {type: MSG.BARCODE_REQUEST, data}
-            },
-            (resp) => {
-                if (done) return;
-                clearTimeout(timer);
-                const lastErr = chrome.runtime.lastError?.message;
-                console.info('[A] cb', {lastError: lastErr, resp});
+        chrome.runtime.sendMessage({
+            type: MSG.ROUTE_TO_ROLE, targetRole: ROLES.B, corrId, // 保持你旧版协议（发 BARCODE_REQUEST）
+            payload: {type: MSG.BARCODE_REQUEST, data}
+        }, (resp) => {
+            if (done) return;
+            clearTimeout(timer);
+            const lastErr = chrome.runtime.lastError?.message;
 
-                // 通道错误或后台未回
-                if (lastErr || resp == null) {
-                    return fail(lastErr || 'empty resp');
-                }
-
-                // 后台显式告知“没有目标 frame”
-                if (resp.ok !== true) {
-                    // 统一把“无目标/无响应”视为未启动（兼容旧后台的 no-response）
-                    if (resp.reason === 'no-target-frames' || resp.reason === 'no-response') {
-                        return fail(resp.reason);
-                    }
-
-                    // 其它业务失败，原样抛给上层
-                    return reject(new Error(resp.reason || '二次分拣页面处理失败！'));
-                }
-
-                done = true;
-                resolve({message:resp.message, data:resp.data});
+            // 通道错误或后台未回
+            if (lastErr || resp == null) {
+                return fail(lastErr || 'empty resp');
             }
-        );
+
+            // 后台显式告知“没有目标 frame”
+            if (resp.ok !== true) {
+                // 统一把“无目标/无响应”视为未启动（兼容旧后台的 no-response）
+                if (resp.reason === 'no-target-frames' || resp.reason === 'no-response') {
+                    return fail(resp.reason);
+                }
+
+                // 其它业务失败，原样抛给上层
+                return reject(new Error(resp.reason || '二次分拣页面处理失败！'));
+            }
+
+            done = true;
+            resolve({message: resp.message, data: resp.data});
+        });
     });
 }
 
@@ -146,15 +138,19 @@ class ErrorPromptEventInterceptor {
 
     async handle(errorText) {
         try {
+            console.info('开始处理错误弹窗逻辑......');
             this.isProcessing = true;
             const input = document.querySelector(this.cfg.productBarcodeSelector);
             const barcode = input ? (input.value || '').trim() : '';
+            console.info('barcode:' + barcode);
             if (barcode === '') {
                 return;
             }
-            if (!(errorText.startsWith(`产品代码${barcode}`) && errorText.endsWith('未找到匹配未完成的订单'))) {
+            if (!(errorText.startsWith(`产品代码:${barcode}`) && errorText.endsWith('未找到匹配未完成的订单'))) {
                 return;
             }
+
+            console.info('是要处理的错误，继续向下');
 
             console.info('[A] 当前条码：', barcode);
 
@@ -170,7 +166,7 @@ class ErrorPromptEventInterceptor {
             const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
 
             //显示二次分拣页面的业务处理数据
-            window.xAI.PublicLabelManager.showSuccess(`${message} : ${data}`);
+            window.xAI.PublicSidePanelManager.showProductRow(data);
         } catch (e) {
 
             //显示二次分拣页面处理这边发过去的数据有问题
