@@ -1,56 +1,26 @@
-# TBA FixKing Chrome 扩展
+# AB Bridge Helper (Frame-Aware, MV3)
 
-## 简介
+域名：http://yzt.wms.yunwms.com
+A：/shipment/orders-one-pack/list
+B：/shipment/orders-pack/sorting
 
-TBA FixKing 是一个 Chrome 扩展，用于对易仓系统进行功能增强，提升仓库管理效率。
+## 思路
+- content_script 以 all_frames 注入到每个 iframe，并根据 pathname 判定角色（A/B）。
+- 每个 iframe 启动后向 background 发送 ROLE_READY（登记 tabId, frameId）。
+- A 发生错误时，A→bg 指定 targetRole=B；bg 根据 (tabId,frameId) 精确把消息投递给 B 的 iframe；
+  B 处理后经 sendResponse 单次回包至 A。
 
-## 主要功能
+## 代码位置
+- src/background.js：按 (tabId, frameId) 路由
+- src/content/injector.js：识别角色并加载 roleA/roleB
+- src/content/sku-trigger.js：A 端读取 #productBarcode，发起到 B
+- src/content/second-sorting.js：B 端调 API、填写 #pickingCode、点击 #submitPicking、等待结果并回包
+- src/common/logger.js：日志（Options 可配级别）
+- src/common/api-client.js：API 客户端封装
+- src/common/protocol.js：消息常量与 corrId
+- src/options/*：配置页
 
-### 1. 数据抓取
-- 自动抓取拣货单列表数据
-- 支持多仓库数据管理
-- 数据自动保存到本地 IndexedDB
-
-### 2. 数据库查看器
-- 查看所有抓取的拣货单数据
-- 按仓库统计拣货单数量
-- 支持搜索和分页功能
-
-### 3. 数据管理
-- 一键清除所有数据
-- 数据库大小监控
-
-## 使用方法
-
-1. 安装扩展后，点击扩展图标打开弹窗
-2. 点击"抓取数据"按钮开始抓取拣货单数据
-3. 点击"数据库查看器"查看已抓取的数据
-4. 点击"删除数据"清除所有数据
-
-## 技术栈
-
-- Chrome Extension Manifest V3
-- IndexedDB 本地数据存储
-- Service Worker 后台处理
-- Content Script 页面注入
-
-## 文件结构
-
-```
-├── manifest.json              # 扩展配置文件
-├── background.js              # Service Worker
-├── content.js                 # 内容脚本
-├── popup.html                 # 弹窗界面
-├── popup-event-handler.js     # 弹窗事件处理
-├── popup-utils.js             # 弹窗工具函数
-├── popup-styles.css           # 弹窗样式
-├── database.js                # 数据库操作
-├── fetcher/picking-fetcher.js # 数据抓取模块
-├── message-handler.js         # 消息处理
-├── utils.js                   # 通用工具
-├── db-viewer.html             # 数据库查看器
-├── db-viewer.js               # 数据库查看器脚本
-├── iframe-injector.js         # iframe注入模块
-├── iframe.html                # iframe页面
-└── iframe-style.css           # iframe样式
-``` 
+## 使用
+1) chrome://extensions → 开发者模式 → 加载已解压的扩展程序。
+2) Options 中配置 Logger/Api 参数。
+3) 在 A 页面触发错误（示例 Alt+B），B 自动处理并回包。

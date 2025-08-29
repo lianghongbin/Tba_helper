@@ -10,4 +10,12 @@ const Utils = {
 
         return `${year}-${month}-${day} 00:00:00`;
     }
-}; 
+};
+
+// 导出 Utils 对象
+export { Utils };
+
+// 兼容 CommonJS
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Utils };
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>AB Bridge Options (Frame-Aware)</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 20px; }
+        label { display:block; margin-top:12px; }
+        input, select { width: 420px; max-width: 100%; padding:6px; }
+        .row { margin-bottom: 8px; }
+        .ok { color: green; margin-left: 8px; }
+    </style>
+</head>
+<body>
+<h1>AB Bridge Settings</h1>
+<div class="row">
+    <label>Logger Level
+        <select id="logLevel">
+            <option value="error">error</option>
+            <option value="warn">warn</option>
+            <option value="info">info</option>
+            <option value="debug">debug</option>
+        </select>
+    </label>
+</div>
+<div class="row">
+    <label>API Base URL
+        <input id="apiBase" placeholder="http://yzt.wms.yunwms.com" />
+    </label>
+</div>
+<div class="row">
+    <label>API Token (optional)
+        <input id="apiToken" placeholder="Your token" />
+    </label>
+</div>
+<div class="row">
+    <label>Timeout (ms)
+        <input id="timeoutMs" type="number" min="1000" step="500" value="10000" />
+    </label>
+</div>
+<button id="save">Save</button><span id="status"></span>
+<script type="module" src="./options.js"></script>
+</body>
+</html>

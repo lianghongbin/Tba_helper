@@ -1,84 +1,37 @@
 {
   "manifest_version": 3,
-  "name": "TBA FixKing",
-  "version": "1.0",
-  "description": "对易仓系统做一些功能增强，提升仓库管理效率",
-  "permissions": [
-    "scripting",
-    "webNavigation",
-    "declarativeNetRequest",
-    "storage",
-    "alarms",
-    "cookies",
-    "unlimitedStorage",
-    "activeTab",
-    "tabs"
-  ],
-  "host_permissions": [
-    "http://yzt.wms.yunwms.com/*",
-    "https://yzt.wms.yunwms.com/*"
-  ],
+  "name": "AB Bridge Helper (Frame-Aware, YZT)",
+  "version": "0.5.0",
+  "description": "在同一浏览器 Tab 的多 iframe（单页系统）中，精确路由 A↔B 的跨页面流程。",
+  "permissions": ["tabs", "storage", "scripting"],
+  "host_permissions": ["http://yzt.wms.yunwms.com/*"],
   "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_title": "TBA FixKing",
-    "default_popup": "popup.html"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": [
-        "http://yzt.wms.yunwms.com/*",
-        "https://yzt.wms.yunwms.com/*"
+        "http://yzt.wms.yunwms.com/shipment/orders-one-pack/list*",
+        "http://yzt.wms.yunwms.com/shipment/orders-pack/sorting*"
       ],
-      "js": [
-        "utils.js",
-        "database.js",
-        "page/second-sorting.js",
-        "warehouse-storage.js",
-        "warehouse-manager.js",
-        "fetcher/handover-order-fetcher.js",
-        "picking-code-selector.js",
-        "picking-code-initializer.js",
-        "public-label.js",
-        "intercept/error-prompt-handler.js",
-        "intercept/error-prompt-event.js",
-        "intercept/product-barcode-event.js",
-        "intercept/product-barcode-handler.js",
-        "content.js"
-      ],
-      "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": true,
+      "js": ["src/content/injector.js"],
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": [
-        "utils.js",
-        "database.js",
-        "page/second-sorting.js",
-        "warehouse-storage.js",
-        "warehouse-manager.js",
-        "picking-code-selector.js",
-        "picking-code-initializer.js",
-        "fetcher/picking-fetcher.js",
-        "message-handler.js",
-        "iframe-injector.js",
-        "popup-styles.css",
-        "popup-utils.js",
-        "popup-event-handler.js",
-        "popup-main.js",
-        "public-label.js",
-        "intercept/error-prompt-handler.js",
-        "intercept/error-prompt-event.js",
-        "intercept/product-barcode-event.js",
-        "intercept/product-barcode-handler.js",
-        "db-viewer.html",
-        "db-viewer.js"
+        "src/common/*.js",
+        "src/content/sku-trigger.js",
+        "src/content/second-sorting.js"
       ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "matches": ["http://yzt.wms.yunwms.com/*"]
     }
-  ]
+  ],
+  "options_page": "src/options/options.html",
+  "action": {
+    "default_title": "AB Bridge Helper"
+  }
 }

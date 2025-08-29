@@ -1,5 +1,7 @@
 // 交接班数据抓取模块
-const HandoverOrderFetcher = {
+import { Utils } from './utils.js';
+
+export class ApiClient {
     /**
      * 获取拣货类型名称
      * @param {string} pickingType - 拣货类型代码
@@ -16,12 +18,12 @@ const HandoverOrderFetcher = {
             default:
                 return `未知类型[${pickingType}]`;
         }
-    },
+    }
 
     /**
      * 处理交接班数据
      * @param {Array} data - 原始数据数组
-     * @param {string} pickingType - 订单类别: 空：全部； 01:一票一件和一票一件多个； 0:一票一件; 1：一票一件多个; 2：一票多个
+     * @param {string} pickingType - 订单类别: 空：全部； 01:一票一件和一票一件多个； 0:一票一件; 1：一票一件多个; 2：一票多件
      * @returns {Array} - 处理后的数据数组
      */
     processHandoverData(data, pickingType) {
@@ -37,20 +39,20 @@ const HandoverOrderFetcher = {
                     productBarcode: product.product_barcode || ''
                 }))
             }));
-        } else if (pickingType ==='01') {
+        } else if (pickingType === '01') {
             return data
                 .filter(item => (item.E16 === '0' || item.E16 === '1'))
                 .map(item => ({
-                id: item.E0 || 0,
-                pickingCode: item.picking_code || '',
-                pickingType: item.E16 || '',
-                pickingTypeName: this.getPickingTypeName(item.E16 || ''),
-                orderProduct: (item.order_product || []).map(product => ({
-                    orderId: product.order_id || '',
-                    quantity: product.op_quantity || '',
-                    productBarcode: product.product_barcode || ''
-                }))
-            }));
+                    id: item.E0 || 0,
+                    pickingCode: item.picking_code || '',
+                    pickingType: item.E16 || '',
+                    pickingTypeName: this.getPickingTypeName(item.E16 || ''),
+                    orderProduct: (item.order_product || []).map(product => ({
+                        orderId: product.order_id || '',
+                        quantity: product.op_quantity || '',
+                        productBarcode: product.product_barcode || ''
+                    }))
+                }));
         }
 
         return data
@@ -66,7 +68,7 @@ const HandoverOrderFetcher = {
                     productBarcode: product.product_barcode || ''
                 }))
             }));
-    },
+    }
 
     /**
      * 获取交接班数据
@@ -87,7 +89,7 @@ const HandoverOrderFetcher = {
 
         const url = 'http://yzt.wms.yunwms.com/shipment/close-report/list/page/1/pageSize/10000';
 
-        // 构建请求参数（使用 URLSearchParams，确保 urlencoded 格式）
+        // 构建请求参数（使用 FormData，确保 urlencoded 格式）
         const params = new FormData();
         params.append('E16', orderType);  // 订单状态：空是所有；0、未打包；1、未签出
         params.append('E4', warehouseCode);   // 仓库：1是一号仓，2是二号仓
@@ -98,7 +100,7 @@ const HandoverOrderFetcher = {
                 params.append('E016', '1')
         }
         params.append('pickingCodeSearchType', '1');    // 拣货单搜索方式：1、精准匹配；2、模糊匹配
-        if (pickingCode!=='') {
+        if (pickingCode !== '') {
             params.append('picking_code', pickingCode);
         }
         params.append('searchDateType', 'createDate');
@@ -151,7 +153,7 @@ const HandoverOrderFetcher = {
             console.error(`获取 ${dateFor} 的交接班数据失败:`, error);
             throw error;
         }
-    },
+    }
 
     /**
      * 获取当天的交接班数据
@@ -160,7 +162,7 @@ const HandoverOrderFetcher = {
     async fetchTodayHandoverData() {
         const dateFor = Utils.getCurrentDate();
         return this.fetchHandoverData(dateFor);
-    },
+    }
 
     /**
      * 根据产品条码查找一票一件多个拣货单中的订单信息（返回最新的一条）
@@ -168,7 +170,6 @@ const HandoverOrderFetcher = {
      * @param {string} warehouseCode - 仓库编码， '2'
      * @param {string} pickingType - 订单类别，一票一件：0，一票一件多个：1; 如果参数是 01，则取出一票一件和一票一件多个的订单
      * @returns Promise<{{id:{string}, pickingCode:{string}, pickingType:{string}, pickingTypeName:{string}, orderProduct:[{orderId:{string}, quantity:{string}, productBarcode:{string}}]}}>|null - 找到的最新订单信息，如果没找到返回null
-     *
      */
     async findLatestOrderByProductBarcode(productBarcode, warehouseCode = '2', pickingType = '1') {
         if (!productBarcode) {
@@ -183,7 +184,6 @@ const HandoverOrderFetcher = {
         console.log(`开始查找产品条码 ${productBarcode} 的最新订单信息`);
 
         try {
-
             // 直接调用fetchHandoverData获取所有数据
             const allHandoverData = await this.fetchHandoverData('', productBarcode, warehouseCode, pickingType);
 
@@ -203,17 +203,16 @@ const HandoverOrderFetcher = {
             throw error;
         }
     }
-};
+}
 
 // 挂到全局，供其它脚本访问（兼容两种命名空间）
 if (typeof window !== 'undefined') {
-    window.HandoverOrderFetcher = HandoverOrderFetcher;
+    window.ApiClient = ApiClient;
     window.xAI = window.xAI || {};
-    window.xAI.HandoverOrderFetcher = HandoverOrderFetcher;
+    window.xAI.ApiClient = ApiClient;
 }
 
-// 保持同步挂载到全局（已在上方 window.HandoverOrderFetcher = HandoverOrderFetcher）
 // Node 环境导出
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = HandoverOrderFetcher;
+    module.exports = ApiClient;
 }
