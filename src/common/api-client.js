@@ -82,7 +82,7 @@ export class ApiClient {
      */
     async fetchHandoverData(pickingCode = '', productSku = '', warehouseCode = '1', pickingType = '1', dateFor = '', orderType = '0') {
         if (dateFor == null || dateFor === '') {
-            dateFor = Utils.getCurrentDate();
+            dateFor = '2025-06-03 00:00:00';
         }
 
         console.log(`开始获取 ${dateFor} 的交接班数据...`);
