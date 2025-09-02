@@ -17,8 +17,11 @@ async function getApi() {
 /** 去除输入框内所有空白字符 */
 function sanitizeInputValue(input) {
     if (!input || !input.value) return;
-    const original = input.value;
+    const original = input.value.trim();
+    console.info(original);
+
     const cleaned = original.replace(/\s+/g, '');
+    console.info(cleaned);
     if (original !== cleaned) {
         input.value = cleaned;
         console.info('[sku-monitor] cleaned:', { original, cleaned });

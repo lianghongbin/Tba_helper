@@ -14,7 +14,7 @@
       right: 16px;
       width: 500px;          /* 固定宽度 */
       max-width: 50vw;       /* 窄屏降级 */
-      max-height: 80vh;      /* 竖向限制，内部滚动 */
+      max-height: 92vh;      /* 竖向限制，内部滚动 */
       z-index: 2147483647;
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -46,7 +46,7 @@
     .xai-float__body{
       padding:10px;
       overflow:auto;                         /* 内容区滚动 */
-      max-height: calc(80vh - 44px);         /* 扣掉 header 高度 */
+      max-height: calc(92vh - 44px);         /* 扣掉 header 高度 */
       pointer-events: auto;
       user-select: text;
       white-space: normal;
@@ -233,6 +233,17 @@
 
     /** 对外：直接显示产品信息（表头 + 单行数据） */
     function showProductRow(data) {
+        try {
+            // 如果是字符串，自动解析
+            if (typeof data === 'string') {
+                data = JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('[PublicSidePanel] JSON.parse error:', e, data);
+            return;
+        }
+
+        // 保持原有逻辑
         show(renderProductTableRow(data), 'info');
     }
 

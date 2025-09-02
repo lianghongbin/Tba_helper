@@ -112,7 +112,7 @@ class ErrorPromptEventInterceptor {
         });
         this.observer.observe(container, {childList: true, subtree: true});
         log.info('弹窗监听器已启动');
-        window.xAI.PublicLabelManager.showInfo('已启动 SKU 错误弹窗监听');
+        window.xAI.PublicSidePanelManager.showError('已启动 SKU 错误弹窗监听');
     }
 
     onNodeAdded(node) {
@@ -133,11 +133,12 @@ class ErrorPromptEventInterceptor {
         const barcode = input ? (input.value || '').trim() : '';
         const isTarget =
             barcode &&
-            errorText.startsWith(`产品代码:${barcode}`) &&
+            errorText.startsWith(`产品代码`) &&
             errorText.endsWith('未找到匹配未完成的订单');
 
         if (!isTarget) {
             // 非目标错误：不处理，保持页面原有行为（弹窗怎么显示继续怎么显示）
+            console.info('------非目标弹窗------');
             return;
         }
 
@@ -166,7 +167,6 @@ class ErrorPromptEventInterceptor {
 
             const latest = await api.findLatestOrderByProductBarcode(barcode, '1', '1');
             if (!latest?.pickingCode) {
-                window.xAI.PublicLabelManager.showSuccess(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
                 window.xAI.PublicSidePanelManager.showError(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
                 return;
             }
@@ -175,7 +175,7 @@ class ErrorPromptEventInterceptor {
 
             // 发消息到 B（这里仍用你旧的字段名示范；你也可以改回真实业务字段）
             const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
-
+            console.info('---------------二次分拣打印页面数据:' + data);
             //显示二次分拣页面的业务处理数据
             window.xAI.PublicSidePanelManager.showProductRow(data);
         } catch (e) {
@@ -218,5 +218,5 @@ try {
     }
 } catch (e) {
     log.error('sku-trigger 初始化失败：', e);
-    window.xAI.PublicLabelManager.showError(`sku-trigger 初始化失败：${e?.message || e}`);
+    window.xAI.PublicSidePanelManager.showProductRow(`sku-trigger 初始化失败：${e?.message || e}`);
 }
