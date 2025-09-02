@@ -2,7 +2,6 @@
  * sku-trigger.js
  * --------------------------
  * 监听错误弹窗，取 barcode，路由给 B。
- * UI 提示仍可用 PublicLabelManager，但所有关键路径都用 console.info 打印，避免静默。
  */
 
 import {Logger} from '../common/logger.js';
@@ -112,7 +111,7 @@ class ErrorPromptEventInterceptor {
         });
         this.observer.observe(container, {childList: true, subtree: true});
         log.info('弹窗监听器已启动');
-        window.xAI.PublicSidePanelManager.showError('已启动 SKU 错误弹窗监听');
+        window.xAI.PublicSidePanelManager.showInfo('已启动 SKU 错误弹窗监听');
     }
 
     onNodeAdded(node) {
@@ -171,7 +170,6 @@ class ErrorPromptEventInterceptor {
                 return;
             }
 
-            //window.xAI.PublicLabelManager.showInfo(`条码：${barcode}， 有一票一件多个订单,正在打印.......`);
 
             // 发消息到 B（这里仍用你旧的字段名示范；你也可以改回真实业务字段）
             const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
@@ -182,7 +180,7 @@ class ErrorPromptEventInterceptor {
 
             //显示二次分拣页面处理这边发过去的数据有问题
             const msg = String(e?.message || e);
-            window.xAI.PublicLabelManager.showError(msg);
+            window.xAI.PublicSidePanelManager.showError(msg);
         } finally {
             const input = document.querySelector(this.cfg.productBarcodeSelector);
             if (input) {

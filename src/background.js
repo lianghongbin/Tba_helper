@@ -1,8 +1,8 @@
 /**
- * Background（Service Worker, ES Module）
+ * background.js
+ * ----------------
  * - 维护 role→frames 的注册表（tabId:frameId）
- * - 接收 ROUTE_TO_ROLE：若 B 未注册，或已关闭/无响应 → 一律返回 { ok:false, reason:'no-target-frames' }
- * - 加强日志，便于你在 SW 控制台确认每一步
+ * - 增强：支持心跳 PING/PONG，更新 lastSeen
  */
 
 import { Logger } from './common/logger.js';
@@ -10,22 +10,30 @@ import { MSG, ROLES } from './common/protocol.js';
 
 const log = new Logger({ scope: 'bg' });
 
-/** 角色→已注册 frame key 的集合 */
 const registry = {
     [ROLES.A]: new Set(),
     [ROLES.B]: new Set()
 };
-
-/** 保存一些元信息，便于清理（可选） */
 const frameMeta = new Map(); // key -> { tabId, frameId, url, lastSeen }
 
-/** 小工具：统一移除 */
 function removeKey(key) {
     for (const r of Object.keys(registry)) registry[r].delete(key);
     frameMeta.delete(key);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // === 新增：PING 处理（前端心跳用） ===
+    if (msg?.type === 'PING') {
+        const tabId = sender?.tab?.id;
+        const frameId = sender?.frameId;
+        if (tabId != null && frameId != null) {
+            const key = `${tabId}:${frameId}`;
+            const meta = frameMeta.get(key);
+            if (meta) meta.lastSeen = Date.now(); // 刷新 lastSeen
+        }
+        sendResponse?.({ ok: true, type: 'PONG' });
+        return;
+    }
 
     if (msg?.type === 'CHECK_B_REGISTERED') {
         const allB = Array.from(registry[ROLES.B] || []);
@@ -34,7 +42,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
     }
 
-    // —— 注册 —— //
+    // === 注册 ===
     if (msg?.type === MSG.ROLE_READY) {
         const role = msg.role;
         if (!role || !registry[role]) {
@@ -52,14 +60,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         const key = `${tabId}:${frameId}`;
         registry[role].add(key);
-        frameMeta.set(key, { tabId, frameId, url, lastSeen: Date.now() });
+        // === 修改：注册时刷新 lastSeen ===
+        const old = frameMeta.get(key) || {};
+        frameMeta.set(key, { ...old, tabId, frameId, url, lastSeen: Date.now() });
 
         log.info('[ROLE_READY]', role, key);
         sendResponse?.({ ok: true });
         return;
     }
 
-    // —— 注销（可选，但能减少僵尸条目）—— //
+    // === 注销 ===
     if (msg?.type === MSG.ROLE_BYE) {
         const tabId = sender?.tab?.id;
         const frameId = sender?.frameId;
@@ -72,7 +82,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
     }
 
-    // —— 路由 —— //
+    // === 路由 ===
     if (msg?.type === MSG.ROUTE_TO_ROLE) {
         const { targetRole, payload, corrId } = msg;
         const fromTabId = sender?.tab?.id;
@@ -81,9 +91,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const sameTab = all.filter((k) => k.startsWith(`${fromTabId}:`));
         const key = sameTab[0] || all[0];
 
-        log.info('[ROUTE_TO_ROLE]', { targetRole, countAll: all.length, countSameTab: sameTab.length, chosen: key });
+        log.info('[ROUTE_TO_ROLE]', {
+            targetRole,
+            countAll: all.length,
+            countSameTab: sameTab.length,
+            chosen: key
+        });
 
-        // 1) 没有任何目标（B 未启动）
         if (!key) {
             log.info('[route] no-target-frames');
             sendResponse?.({ ok: false, reason: 'no-target-frames' });
@@ -101,15 +115,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             (resp) => {
                 const lastErr = chrome.runtime.lastError;
 
-                // 2) 发不出去/对方无响应（B 可能已被关闭）：移除并统一回“未就绪”
                 if (lastErr || resp == null) {
-                    log.info('[route] tabs.sendMessage failed/empty', { lastError: lastErr?.message, respType: typeof resp });
+                    log.info('[route] tabs.sendMessage failed/empty', {
+                        lastError: lastErr?.message,
+                        respType: typeof resp
+                    });
                     removeKey(`${tabId}:${frameId}`);
                     sendResponse?.({ ok: false, reason: 'no-target-frames' });
                     return;
                 }
 
-                // 3) 正常回包：直接转发
+                // === 修改：路由成功时刷新 lastSeen ===
+                const meta = frameMeta.get(`${tabId}:${frameId}`);
+                if (meta) meta.lastSeen = Date.now();
+
                 log.info('[route] ok -> pass through');
                 sendResponse?.(resp);
             }
@@ -119,7 +138,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
-// 轻量清理（保持原有策略即可）
+// 清理器仍然保留（避免真僵尸）
 setInterval(() => {
     const now = Date.now();
     for (const [key, meta] of frameMeta) {
