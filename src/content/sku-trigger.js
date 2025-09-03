@@ -7,9 +7,11 @@
 import {Logger} from '../common/logger.js';
 import {MSG, ROLES, makeCorrId} from '../common/protocol.js';
 import {ApiClient} from '../common/api-client.js';
+import {ProductFetcher} from "../common/product-fetcher.js";
 
 const log = new Logger({scope: 'sku-trigger'});
 const api = new ApiClient();
+const productFetcher = new ProductFetcher();
 
 /** 配置 */
 const CONFIG = {
@@ -111,7 +113,7 @@ class ErrorPromptEventInterceptor {
         });
         this.observer.observe(container, {childList: true, subtree: true});
         log.info('弹窗监听器已启动');
-        window.xAI.PublicSidePanelManager.showInfo('已启动 SKU 错误弹窗监听');
+        window.xAI.PublicSidePanelManager.showInfo('插件已启动！');
     }
 
     onNodeAdded(node) {
@@ -123,7 +125,6 @@ class ErrorPromptEventInterceptor {
 
         const errorText = (errEl.textContent || '').trim();
         if (!errorText) return;
-
         /* =========================
          * [ADD] 仅在“特定错误文案”时拦截并继续处理；
          *       其它任何错误弹窗：不拦截、也不进入 handle（直接 return）
@@ -161,15 +162,19 @@ class ErrorPromptEventInterceptor {
             //如果二次分拣页面没有打开
             if (!await isBRegistered()) {
                 window.xAI.PublicSidePanelManager.showError('二次分拣页面没有打开.');
+
                 return;
             }
 
-            const latest = await api.findLatestOrderByProductBarcode(barcode, '1', '1');
+            console.info('二次分拣页面检测通过.');
+            const productBarcodes = await productFetcher.fetchProductBarcodes(barcode);
+            const multiBarcodes = this.mergeBarcodes(productBarcodes, barcode);
+
+            const latest = await api.findLatestOrderByProductBarcode(multiBarcodes, '1', '1');
             if (!latest?.pickingCode) {
                 window.xAI.PublicSidePanelManager.showError(`条码：${barcode}， 没有一票一件多个订单,扫描下一个.`);
                 return;
             }
-
 
             // 发消息到 B（这里仍用你旧的字段名示范；你也可以改回真实业务字段）
             const {message, data} = await routeToBNoWait({productBarcode: barcode, pickingCode: latest.pickingCode});
@@ -189,6 +194,13 @@ class ErrorPromptEventInterceptor {
             }
             this.isProcessing = false;
         }
+    }
+
+    mergeBarcodes(productBarcodes, barcode) {
+        if (Array.isArray(productBarcodes) && productBarcodes.length > 0) {
+            return [...productBarcodes, barcode].join(' ');
+        }
+        return barcode; // 数组为空，直接返回单个 barcode
     }
 }
 

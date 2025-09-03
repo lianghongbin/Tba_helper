@@ -199,10 +199,12 @@
     }
 
     function showInfo(html) {
+        console.info('showInfo:' + html);
         show(html, 'info');
     }
 
     function showError(html) {
+        console.info('showError:' + html);
         show(html, 'error');
     }
 

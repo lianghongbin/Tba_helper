@@ -160,7 +160,7 @@ export class ApiClient {
      * @returns {Promise<Array>} - 当天的交接班数据
      */
     async fetchTodayHandoverData() {
-        const dateFor = Utils.getCurrentDate();
+        const dateFor = Utils.getFromDate();
         return this.fetchHandoverData(dateFor);
     }
 
