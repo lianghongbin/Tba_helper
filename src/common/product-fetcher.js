@@ -53,7 +53,7 @@ export class ProductFetcher {
             );
 
             log.info(
-                `[ProductFetcher] 获取到 ${productBarcodes.length} 个唯一 productBarcode`,
+                `[ProductFetcher] 获取到 ${productBarcodes.length} 个 productBarcode`,
                 productBarcodes
             );
             return productBarcodes;

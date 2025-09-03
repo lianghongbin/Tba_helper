@@ -1,24 +1,15 @@
 /**
- * sku-monitor.js（原 barcode-monitor.js）
- * 简洁版：监听 #productBarcode 的 Enter 与确认按钮 click，
- * 在默认行为发生前先把条码里的所有空白清理掉，然后让页面原有流程继续执行。
- * 另外：在确认按钮旁新增一个“插件按钮”，点击时调用 handleExtraButtonClick()
+ * sku-monitor.js
+ * 功能：
+ *   - 当 #productBarcode 输入框按下回车时，先清洗数据；
+ *   - 当输入框失去焦点时（点击确认按钮或切换焦点），清洗数据；
+ *   - 确认按钮的点击事件不再拦截，避免阻塞逻辑。
  */
 
-let _api = null;
-async function getApi() {
-    if (!_api) {
-        const mod = await import(chrome.runtime.getURL('src/common/api-client.js'));
-        _api = new mod.ApiClient();
-    }
-    return _api;
-}
-
 /** 去除输入框内所有空白字符 */
-async function sanitizeInputValue(input) {
+function sanitizeInputValue(input) {
     if (!input || !input.value) return;
     const original = input.value.trim();
-
     const cleaned = original.replace(/\s+/g, '');
     if (original !== cleaned) {
         input.value = cleaned;
@@ -26,25 +17,21 @@ async function sanitizeInputValue(input) {
     }
 }
 
-/** 绑定监听：Enter（捕获阶段，先于页面逻辑执行），与确认按钮 click */
-function setupSKUInputSanitizer(input, button) {
+/** 绑定监听：Enter + blur */
+function setupSKUInputSanitizer(input) {
     if (!input) return;
 
-    // Enter：先清理，再让默认回车/页面监听继续（不阻止默认）
-    input.addEventListener('keydown', async (e) => {
+    // 回车：输入框不会 blur，需要单独监听
+    input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.isTrusted) {
-            await sanitizeInputValue(input);
-            // 不调用 preventDefault，让原流程继续
+            sanitizeInputValue(input); // 不要 await，保持同步
         }
-    }); // 捕获阶段，确保清理发生在默认行为之前
+    }, true); // 捕获阶段，确保在页面逻辑前执行
 
-    // Click：点击前清理输入值，再让页面原有点击逻辑继续
-    if (button) {
-        button.addEventListener('click', (e) => {
-            sanitizeInputValue(input);
-            // 不阻止点击，让原逻辑继续
-        }); // 捕获阶段
-    }
+    // 失去焦点：点击按钮/切换焦点都会触发
+    input.addEventListener('blur', () => {
+        sanitizeInputValue(input); // 不要 await，避免阻塞 click
+    });
 }
 
 /** 轮询查找元素并绑定（简洁稳定） */
@@ -53,10 +40,9 @@ function waitForElements() {
     let n = 0;
     const timer = setInterval(() => {
         const input = document.querySelector('#productBarcode');
-        const confirmBtn = document.querySelector('input.baseBtn.submitProduct');
         if (input) {
             clearInterval(timer);
-            setupSKUInputSanitizer(input, confirmBtn);
+            setupSKUInputSanitizer(input);
         } else if (n >= max) {
             clearInterval(timer);
         }
