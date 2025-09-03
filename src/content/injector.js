@@ -70,7 +70,7 @@
                         log.info('[ROLE_READY:periodic]', role, iframeId, res);
                     });
                 } catch (_) {}
-            }, 30000);
+            }, 60000);
 
             // === 卸载时注销 ===
             window.addEventListener('beforeunload', () => {

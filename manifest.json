@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AB Bridge Helper (Frame-Aware, YZT)",
+  "name": "Tba Fixking",
   "version": "0.5.0",
-  "description": "在同一浏览器 Tab 的多 iframe（单页系统）中，精确路由 A↔B 的跨页面流程。",
+  "description": "增强原易仓 WMS 业务，提升一键代发效率。",
   "permissions": ["tabs", "storage", "scripting"],
   "host_permissions": ["http://yzt.wms.yunwms.com/*"],
   "background": {
